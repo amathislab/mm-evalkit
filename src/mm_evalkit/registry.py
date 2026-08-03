@@ -58,7 +58,7 @@ _DATASETS = (
         body_model="bimanual",
         module="mm_evalkit.workflows.bimanual",
         entrypoint="main",
-        description="Bimanual upper-limb kinematics and sEMG from ULTra-MoCap.",
+        description="Bimanual upper-limb kinematics and sEMG from ULTRA-MoCap.",
         aliases=("ultramocap",),
     ),
 )

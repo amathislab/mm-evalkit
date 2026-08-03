@@ -1,4 +1,4 @@
-"""Wiring of the ULTra-MoCap paired statistics onto the shared Wilcoxon tests."""
+"""Wiring of the ULTRA-MoCap paired statistics onto the shared Wilcoxon tests."""
 
 import csv
 

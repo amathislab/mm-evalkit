@@ -1,4 +1,4 @@
-"""Strict ULTra-MoCap preprocessed-EMG discovery and time alignment."""
+"""Strict ULTRA-MoCap preprocessed-EMG discovery and time alignment."""
 
 from __future__ import annotations
 
@@ -13,11 +13,11 @@ def validate_emg_roots(roots: Collection[str | Path]) -> tuple[Path, ...]:
     """Require explicitly supplied directories before processing any rollout."""
     paths = tuple(Path(root) for root in roots)
     if not paths:
-        raise ValueError("At least one preprocessed ULTra-MoCap EMG root is required.")
+        raise ValueError("At least one preprocessed ULTRA-MoCap EMG root is required.")
     missing = [path for path in paths if not path.is_dir()]
     if missing:
         listed = "\n".join(f"  - {path}" for path in missing)
-        raise FileNotFoundError(f"Preprocessed ULTra-MoCap EMG root(s) do not exist:\n{listed}")
+        raise FileNotFoundError(f"Preprocessed ULTRA-MoCap EMG root(s) do not exist:\n{listed}")
     return paths
 
 

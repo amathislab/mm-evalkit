@@ -164,7 +164,7 @@ def test_bimanual_rejects_gait120_only_policy_fields(tmp_path: Path):
         ],
     )
 
-    with pytest.raises(ValueError, match="not valid for ULTra-MoCap"):
+    with pytest.raises(ValueError, match="not valid for ULTRA-MoCap"):
         load_bimanual_policies(config, None)
 
 

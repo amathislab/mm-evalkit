@@ -1,4 +1,4 @@
-"""Cycle-level neuromuscular metrics for ULTra-MoCap."""
+"""Cycle-level neuromuscular metrics for ULTRA-MoCap."""
 
 from __future__ import annotations
 

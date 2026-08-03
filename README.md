@@ -17,13 +17,17 @@ rollout NPZ files with recorded human data at three physiological levels:
 The benchmark produces population and subject-matched metrics, human reference
 baselines, statistical reports, figures, and exclusion audits.
 
-## Supported datasets
+## Dataset list
 
-| Dataset | Evaluation | Analysis unit |
-|---|---|---|
-| Gait120 | Joint angles, joint moments, vertical GRF, muscle activation, and EMG | Subject and gait cycle |
-| Wang | Joint angles, muscle activation, and EMG | Population gait profile |
-| ULTra-MoCap | Arm kinematics, muscle activation, and EMG | Subject, movement, and trial |
+MM-EvalKit does not redistribute human recordings. Download each dataset from
+its original archive and cite its accompanying paper using the entries in
+[Citation and dataset credit](#citation-and-dataset-credit).
+
+| Dataset | Official resources | Evaluation | Analysis unit |
+|---|---|---|---|
+| Gait120 | [Data](https://doi.org/10.6084/m9.figshare.27677016) · [Paper](https://doi.org/10.1038/s41597-025-05391-0) | Joint angles, joint moments, vertical GRF, muscle activation, and EMG | Subject and gait cycle |
+| Wang | [Data](https://doi.org/10.5281/zenodo.6457662) · [Paper](https://doi.org/10.1017/wtc.2023.7) | Joint angles, muscle activation, and EMG | Population gait profile |
+| ULTRA-MoCap | [Data](https://doi.org/10.6084/m9.figshare.28751156.v1) · [Paper](https://doi.org/10.1038/s41597-026-06687-5) | Arm kinematics, muscle activation, and EMG | Subject, movement, and trial |
 
 Gait120 provides all three evaluation levels over one retained subject cohort.
 
@@ -48,7 +52,7 @@ python -m pip install 'mm-evalkit[render]'
 ```bash
 mm-evalkit paths set gait120 /absolute/path/to/Gait120
 mm-evalkit paths set wang /absolute/path/to/Wang
-mm-evalkit paths set ultra-mocap /absolute/path/to/ULTra-MoCap
+mm-evalkit paths set ultra-mocap /absolute/path/to/ULTRA-MoCap
 mm-evalkit paths show
 ```
 
@@ -95,7 +99,7 @@ mm-evalkit evaluate wang \
   --plots_dir results/wang
 ```
 
-### ULTra-MoCap
+### ULTRA-MoCap
 
 ```bash
 mm-evalkit evaluate ultra-mocap \
@@ -141,15 +145,15 @@ mm-evalkit render ultra-mocap --help
 
 ## Demos
 
-### Overhead reach (`P11_OverheadReach_180`)
+### Overhead reach (`P11_OverheadReach_180`) · [ULTRA-MoCap dataset](https://doi.org/10.6084/m9.figshare.28751156.v1)
 
-![ULTra-MoCap overhead-reach demo](https://raw.githubusercontent.com/amathislab/mm-evalkit/main/assets/demos/P11_OverheadReach_180_demo.gif)
+![ULTRA-MoCap overhead-reach demo](https://raw.githubusercontent.com/amathislab/mm-evalkit/main/assets/demos/P11_OverheadReach_180_demo.gif)
 
-### Shoulder rotation (`P12_ShoulderRotation_Normal`)
+### Shoulder rotation (`P12_ShoulderRotation_Normal`) · [ULTRA-MoCap dataset](https://doi.org/10.6084/m9.figshare.28751156.v1)
 
-![ULTra-MoCap shoulder-rotation demo](https://raw.githubusercontent.com/amathislab/mm-evalkit/main/assets/demos/P12_ShoulderRotation_Normal_demo.gif)
+![ULTRA-MoCap shoulder-rotation demo](https://raw.githubusercontent.com/amathislab/mm-evalkit/main/assets/demos/P12_ShoulderRotation_Normal_demo.gif)
 
-### Gait step (`S052_step01`)
+### Gait step (`S052_step01`) · [Gait120 dataset](https://doi.org/10.6084/m9.figshare.27677016)
 
 ![Gait120 step demo](https://raw.githubusercontent.com/amathislab/mm-evalkit/main/assets/demos/S052_step01_demo.gif)
 
@@ -191,7 +195,9 @@ Ruff and pre-commit cover every Python file in the repository.
 See [Architecture](https://github.com/amathislab/mm-evalkit/blob/main/ARCHITECTURE.md)
 for data flow, module ownership, input contracts, and public extension points.
 
-## Citation
+## Citation and dataset credit
+
+If you use MM-EvalKit, cite the MuscleMimic paper:
 
 ```bibtex
 @article{Li2026MuscleMimic,
@@ -202,5 +208,41 @@ for data flow, module ownership, input contracts, and public extension points.
     Mathis, Alexander},
   journal={arXiv preprint arXiv:2603.25544},
   year={2026}
+}
+```
+
+Please also cite every human dataset used in your evaluation:
+
+```bibtex
+@article{boo2025comprehensive,
+  title={Comprehensive human locomotion and electromyography dataset: Gait120},
+  author={Boo, Junyo and Seo, Dongwook and Kim, Minseung and Koo, Seungbum},
+  journal={Scientific data},
+  volume={12},
+  number={1},
+  pages={1023},
+  year={2025},
+  publisher={Nature Publishing Group UK London}
+}
+
+@article{wang2023wearable,
+  title={A wearable real-time kinetic measurement sensor setup for human locomotion},
+  author={Wang, Huawei and Basu, Akash and Durandau, Guillaume and Sartori, Massimo},
+  journal={Wearable technologies},
+  volume={4},
+  pages={e11},
+  year={2023},
+  publisher={Cambridge University Press}
+}
+
+@article{fritsche2026ultra,
+  title={ULTRA-MoCap: A multimodal IMU and sEMG dataset for upper body joint kinematics analysis},
+  author={Fritsche, Oliver and Camacho, Steven and Hossain, Md Sanzid Bin and Halfpenny, Tyler and Arciniegas, Carlos and Dranetz, Joseph and Hadley, Dexter and Guo, Zhishan and Choi, Hwan},
+  journal={Scientific Data},
+  volume={13},
+  number={1},
+  pages={622},
+  year={2026},
+  publisher={Nature Publishing Group UK London}
 }
 ```

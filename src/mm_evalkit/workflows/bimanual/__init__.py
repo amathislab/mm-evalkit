@@ -1,4 +1,4 @@
-"""Public API for the ULTra-MoCap neuromuscular workflow."""
+"""Public API for the ULTRA-MoCap neuromuscular workflow."""
 
 from .cli import main
 from .muscles import build_muscle_groups, load_muscle_names

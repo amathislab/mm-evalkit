@@ -1,4 +1,4 @@
-"""Figures and summary tables built from the ULTra-MoCap trial records."""
+"""Figures and summary tables built from the ULTRA-MoCap trial records."""
 
 import matplotlib
 import numpy as np

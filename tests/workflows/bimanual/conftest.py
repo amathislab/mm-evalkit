@@ -1,4 +1,4 @@
-"""Synthetic per-trial records shared by the ULTra-MoCap wiring tests."""
+"""Synthetic per-trial records shared by the ULTRA-MoCap wiring tests."""
 
 import pytest
 

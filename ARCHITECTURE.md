@@ -22,7 +22,7 @@ reliability, and RSA noise ceilings where the dataset supports them.
 |---|---|---|
 | Gait120 | `gait` | Subject and gait cycle |
 | Wang | `gait` | Population gait profile |
-| ULTra-MoCap | `bimanual` | Subject, movement, and trial |
+| ULTRA-MoCap | `bimanual` | Subject, movement, and trial |
 
 The Gait120 workflow evaluates all three benchmark levels over one retained
 subject cohort.

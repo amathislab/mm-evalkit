@@ -1,4 +1,4 @@
-"""Alignment and repetition extraction for one ULTra-MoCap trial."""
+"""Alignment and repetition extraction for one ULTRA-MoCap trial."""
 
 from __future__ import annotations
 

@@ -1,4 +1,4 @@
-"""Typed records passed between the ULTra-MoCap analysis stages."""
+"""Typed records passed between the ULTRA-MoCap analysis stages."""
 
 from __future__ import annotations
 

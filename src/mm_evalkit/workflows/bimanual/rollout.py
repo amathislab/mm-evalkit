@@ -1,4 +1,4 @@
-"""Validated rollout loading and explicit ULTra-MoCap trial provenance."""
+"""Validated rollout loading and explicit ULTRA-MoCap trial provenance."""
 
 from __future__ import annotations
 

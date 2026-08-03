@@ -1,4 +1,4 @@
-"""Representational-similarity matrix figures for ULTra-MoCap."""
+"""Representational-similarity matrix figures for ULTRA-MoCap."""
 
 from __future__ import annotations
 

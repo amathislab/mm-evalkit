@@ -1,4 +1,4 @@
-"""Publication summary table for ULTra-MoCap metrics."""
+"""Publication summary table for ULTRA-MoCap metrics."""
 
 from __future__ import annotations
 
@@ -174,7 +174,7 @@ def plot_metrics_table(policy_records, policies, real_records, out_path_base, ar
     table_height_in = (9 / 72 * 1.2) * (2 * header_units + len(rows) * row_units)
     fig, ax = plt.subplots(figsize=(2.2 * n_metric_cols + 5, table_height_in / 0.77 + 1.2))
     ax.axis("off")
-    ax.set_title(f"ULTra-MoCap: policy vs real, aggregated over {len(groups)} movement/conditions", fontsize=12, pad=12)
+    ax.set_title(f"ULTRA-MoCap: policy vs real, aggregated over {len(groups)} movement/conditions", fontsize=12, pad=12)
 
     table = ax.table(cellText=cell_text, cellLoc="center", loc="upper center", colWidths=col_widths)
     table.auto_set_font_size(False)

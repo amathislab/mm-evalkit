@@ -1,4 +1,4 @@
-"""Policy selection for the ULTra-MoCap command-line adapter."""
+"""Policy selection for the ULTRA-MoCap command-line adapter."""
 
 from __future__ import annotations
 
@@ -23,11 +23,11 @@ def load_policies(
     for policy in policies:
         if policy.earlier_trials_path is not None:
             raise ValueError(
-                f"Policy {policy.id!r} configures Gait120 trials 1-4 fields, which are not valid for ULTra-MoCap."
+                f"Policy {policy.id!r} configures Gait120 trials 1-4 fields, which are not valid for ULTRA-MoCap."
             )
         if policy.kinetics_summary_path is not None or policy.kinetics_swap_left_right:
             raise ValueError(
-                f"Policy {policy.id!r} configures Gait120 kinetics fields, which are not valid for ULTra-MoCap."
+                f"Policy {policy.id!r} configures Gait120 kinetics fields, which are not valid for ULTRA-MoCap."
             )
     validate_policy_files(policies)
     return policies

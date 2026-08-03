@@ -1,4 +1,4 @@
-"""Subject-level paired statistics for the ULTra-MoCap analysis."""
+"""Subject-level paired statistics for the ULTRA-MoCap analysis."""
 
 from __future__ import annotations
 
@@ -195,7 +195,7 @@ def run_wilcoxon_tests(
         plots_dir,
         legend=legend,
         subtitle=(
-            f"ULTra-MoCap: {n_subjects} subjects; trials matched within subject; "
+            f"ULTRA-MoCap: {n_subjects} subjects; trials matched within subject; "
             f"{len(joint_names)} joints, {len(muscle_labels)} electrodes."
         ),
     )

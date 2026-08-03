@@ -1,4 +1,4 @@
-"""Raw and repetition-averaged waveform figures for ULTra-MoCap trials."""
+"""Raw and repetition-averaged waveform figures for ULTRA-MoCap trials."""
 
 from __future__ import annotations
 

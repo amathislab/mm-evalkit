@@ -1,4 +1,4 @@
-"""Strict input and cycle-pairing contracts for the ULTra-MoCap adapter."""
+"""Strict input and cycle-pairing contracts for the ULTRA-MoCap adapter."""
 
 from __future__ import annotations
 

@@ -1,4 +1,4 @@
-"""Per-subject and cross-policy aggregate figures for ULTra-MoCap."""
+"""Per-subject and cross-policy aggregate figures for ULTRA-MoCap."""
 
 from __future__ import annotations
 

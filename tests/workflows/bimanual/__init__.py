@@ -1,1 +1,1 @@
-"""Tests for the bimanual workflow (ULTra-MoCap)."""
+"""Tests for the bimanual workflow (ULTRA-MoCap)."""

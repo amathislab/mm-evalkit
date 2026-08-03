@@ -1,6 +1,6 @@
-"""Movement-cycle segmentation for ULTra-MoCap bimanual trials.
+"""Movement-cycle segmentation for ULTRA-MoCap bimanual trials.
 
-Each ULTra-MoCap recording is ~50 s of a single movement repeated many times
+Each ULTRA-MoCap recording is ~50 s of a single movement repeated many times
 (e.g. a dozen shoulder rotations). To average the muscle / joint pattern over
 *one* canonical movement, the individual repetitions first have to be isolated.
 

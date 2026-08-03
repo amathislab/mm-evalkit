@@ -1,4 +1,4 @@
-"""Thin orchestration for the validated ULTra-MoCap analysis stages."""
+"""Thin orchestration for the validated ULTRA-MoCap analysis stages."""
 
 from __future__ import annotations
 

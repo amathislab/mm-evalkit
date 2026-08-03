@@ -2,7 +2,7 @@
 
 Every metric the neuromuscular analyses report -- joint RMSE, joint correlation,
 muscle/EMG correlation, muscle RSA -- is a *matrix* of paired measurements: one value
-per (unit, channel), where a unit is a subject. ULTra-MoCap trials are matched between
+per (unit, channel), where a unit is a subject. ULTRA-MoCap trials are matched between
 conditions and averaged within subject before they reach this module. The same
 units and channels are scored under every condition being compared -- two policies, a
 policy and a human reference, the population- and subject-matched variant of the same

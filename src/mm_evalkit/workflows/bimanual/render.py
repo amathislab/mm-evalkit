@@ -1,4 +1,4 @@
-"""ULTra-MoCap adapter for the dataset-neutral video renderer."""
+"""ULTRA-MoCap adapter for the dataset-neutral video renderer."""
 
 from __future__ import annotations
 
@@ -40,7 +40,7 @@ def prepare_clip(
     camera_elevation: float = -8.0,
     camera_distance: float = 0.88,
 ) -> RenderClip:
-    """Prepare a clock-synchronized ULTra-MoCap render clip."""
+    """Prepare a clock-synchronized ULTRA-MoCap render clip."""
     if cycles < 1:
         raise ValueError("cycles must be at least one.")
     if cycle_offset < 0:

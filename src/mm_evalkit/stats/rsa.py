@@ -17,7 +17,7 @@ the distribution of RSM values -- and Pearson is returned alongside as a sensiti
 check.
 
 Both full-body and bimanual analyses use this: the former over the 11 Gait120 muscles (55
-pairs) and ``neuromuscular_bimanual`` over the 3 ULTra-MoCap electrodes (**3 pairs**).
+pairs) and ``neuromuscular_bimanual`` over the 3 ULTRA-MoCap electrodes (**3 pairs**).
 Three pairs is a very short vector to correlate -- a Spearman on it can only take a
 handful of values -- so the bimanual RSA is a coarse, qualitative statement about
 coordination and its significance tests are underpowered by construction. That is a

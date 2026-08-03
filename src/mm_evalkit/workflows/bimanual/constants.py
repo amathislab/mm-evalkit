@@ -1,4 +1,4 @@
-"""ULTra-MoCap mappings, scientific parameters, and figure labels."""
+"""ULTRA-MoCap mappings, scientific parameters, and figure labels."""
 
 from mm_evalkit.workflows.bimanual.segmentation import MOVEMENT_CRITICAL_JOINT
 

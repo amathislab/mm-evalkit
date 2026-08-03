@@ -1,4 +1,4 @@
-"""Command-line interface for the ULTra-MoCap analysis."""
+"""Command-line interface for the ULTRA-MoCap analysis."""
 
 from __future__ import annotations
 
@@ -23,7 +23,7 @@ from .pipeline import run_analysis
 def build_parser() -> argparse.ArgumentParser:
     """Describe only user-facing inputs; scientific work lives in the pipeline."""
     parser = argparse.ArgumentParser(
-        description=("Compare MyoBimanualArm policy activation with timestamp-aligned ULTra-MoCap kinematics and EMG.")
+        description=("Compare MyoBimanualArm policy activation with timestamp-aligned ULTRA-MoCap kinematics and EMG.")
     )
     add_policy_source(parser, allow_single_rollout=True)
     add_dataset_dir(parser, dataset="ultra-mocap", aliases=("ultramocap_roots",), multiple=True)
@@ -94,5 +94,5 @@ def parse_options(argv: Sequence[str] | None = None) -> AnalysisConfig:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    """Run the complete ULTra-MoCap analysis."""
+    """Run the complete ULTRA-MoCap analysis."""
     return run_analysis(parse_options(argv))

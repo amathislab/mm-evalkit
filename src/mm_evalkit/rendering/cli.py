@@ -25,7 +25,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     datasets = parser.add_subparsers(dest="dataset", required=True)
 
-    ultra = datasets.add_parser("ultra-mocap", aliases=["ultramocap"], help="Clock-synchronized ULTra-MoCap video.")
+    ultra = datasets.add_parser("ultra-mocap", aliases=["ultramocap"], help="Clock-synchronized ULTRA-MoCap video.")
     ultra.add_argument("--trajectory_path", "--trajectory-path", dest="trajectory_path", required=True)
     ultra.add_argument("--episode", required=True, type=int)
     ultra.add_argument("--trial_stem", "--trial-stem", dest="trial_stem", required=True)
