@@ -1,4 +1,4 @@
-# mm-kit
+# MM-Kit (MuscleMimic Kit)
 
 <p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache%202.0-76B900.svg" alt="License"></a>
