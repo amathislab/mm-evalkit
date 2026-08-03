@@ -1,0 +1,83 @@
+[build-system]
+requires = ["setuptools>=77", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mm-kit"
+version = "0.1.0"
+description = "Benchmark MuscleMimic policy kinematics, kinetics, and neuromuscular behavior against human data"
+readme = "README.md"
+requires-python = ">=3.11"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+authors = [{name = "MuscleMimic Team"}]
+keywords = [
+  "biomechanics",
+  "benchmarking",
+  "electromyography",
+  "kinematics",
+  "kinetics",
+  "musculoskeletal simulation",
+  "neuromuscular behavior",
+]
+dependencies = [
+  "matplotlib>=3.8",
+  "mujoco>=3.3",
+  "musclemimic-models>=1.0.2",
+  "numpy>=2.0",
+  "pandas>=2.2",
+  "pyyaml>=6.0",
+  "scipy>=1.14",
+]
+
+[project.optional-dependencies]
+render = [
+  "imageio-ffmpeg>=0.6",
+  "opencv-python>=4.10",
+]
+dev = [
+  "build>=1.2",
+  "imageio-ffmpeg>=0.6",
+  "opencv-python>=4.10",
+  "pre-commit>=3.8,<4",
+  "pytest>=8",
+  "ruff>=0.9",
+]
+
+[project.scripts]
+mm-kit = "mm_kit.cli:main"
+
+[project.entry-points."mm_kit.datasets"]
+gait120 = "mm_kit.workflows.gait:gait120_main"
+wang = "mm_kit.workflows.gait:wang_main"
+ultra-mocap = "mm_kit.workflows.bimanual:main"
+
+[project.entry-points."mm_kit.renderers"]
+gait120 = "mm_kit.workflows.gait.render:prepare_clip"
+ultra-mocap = "mm_kit.workflows.bimanual.render:prepare_clip"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# The suite mirrors the package, so module basenames repeat across directories
+# and the root package name is shared with the parent repository's suite.
+# importlib import mode keys each test module by its full path instead.
+addopts = "--import-mode=importlib"
+consider_namespace_packages = true
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "W", "F", "I", "N", "UP", "B", "C4", "DTZ", "RUF"]
+ignore = ["E501", "B008", "C901"]
+
+[tool.ruff.lint.per-file-ignores]
+# Public keyword retained verbatim for constructor compatibility.
+"**/workflows/gait/analysis.py" = ["N803"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["mm_kit"]
