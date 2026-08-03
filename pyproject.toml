@@ -3,7 +3,7 @@ requires = ["setuptools>=77", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "mm-kit"
+name = "mm-evalkit"
 version = "0.1.0"
 description = "Benchmark MuscleMimic policy kinematics, kinetics, and neuromuscular behavior against human data"
 readme = "README.md"
@@ -19,6 +19,15 @@ keywords = [
   "kinetics",
   "musculoskeletal simulation",
   "neuromuscular behavior",
+]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Science/Research",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.11",
+  "Topic :: Scientific/Engineering",
 ]
 dependencies = [
   "matplotlib>=3.8",
@@ -44,17 +53,23 @@ dev = [
   "ruff>=0.9",
 ]
 
+[project.urls]
+Homepage = "https://github.com/amathislab/mm-evalkit"
+Repository = "https://github.com/amathislab/mm-evalkit"
+Issues = "https://github.com/amathislab/mm-evalkit/issues"
+Preprint = "https://arxiv.org/abs/2603.25544"
+
 [project.scripts]
-mm-kit = "mm_kit.cli:main"
+mm-evalkit = "mm_evalkit.cli:main"
 
-[project.entry-points."mm_kit.datasets"]
-gait120 = "mm_kit.workflows.gait:gait120_main"
-wang = "mm_kit.workflows.gait:wang_main"
-ultra-mocap = "mm_kit.workflows.bimanual:main"
+[project.entry-points."mm_evalkit.datasets"]
+gait120 = "mm_evalkit.workflows.gait:gait120_main"
+wang = "mm_evalkit.workflows.gait:wang_main"
+ultra-mocap = "mm_evalkit.workflows.bimanual:main"
 
-[project.entry-points."mm_kit.renderers"]
-gait120 = "mm_kit.workflows.gait.render:prepare_clip"
-ultra-mocap = "mm_kit.workflows.bimanual.render:prepare_clip"
+[project.entry-points."mm_evalkit.renderers"]
+gait120 = "mm_evalkit.workflows.gait.render:prepare_clip"
+ultra-mocap = "mm_evalkit.workflows.bimanual.render:prepare_clip"
 
 [tool.setuptools.packages.find]
 where = ["src"]
@@ -80,4 +95,4 @@ ignore = ["E501", "B008", "C901"]
 "**/workflows/gait/analysis.py" = ["N803"]
 
 [tool.ruff.lint.isort]
-known-first-party = ["mm_kit"]
+known-first-party = ["mm_evalkit"]

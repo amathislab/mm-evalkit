@@ -8,8 +8,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from mm_kit import registry
-from mm_kit.cli import main as cli_main
+from mm_evalkit import registry
+from mm_evalkit.cli import main as cli_main
 
 
 def test_registry_exposes_supported_research_datasets():
@@ -22,9 +22,9 @@ def test_registry_exposes_supported_research_datasets():
 def test_registry_targets_public_workflow_entrypoints():
     adapters = registry.registered_datasets()
     assert {(adapter.module, adapter.entrypoint) for adapter in adapters} == {
-        ("mm_kit.workflows.gait", "gait120_main"),
-        ("mm_kit.workflows.gait", "wang_main"),
-        ("mm_kit.workflows.bimanual", "main"),
+        ("mm_evalkit.workflows.gait", "gait120_main"),
+        ("mm_evalkit.workflows.gait", "wang_main"),
+        ("mm_evalkit.workflows.bimanual", "main"),
     }
 
 
@@ -65,7 +65,7 @@ def test_plugin_datasets_are_discovered_without_being_imported(monkeypatch):
     monkeypatch.setattr(
         registry.metadata,
         "entry_points",
-        lambda: SimpleNamespace(select=lambda group: (entry_point,) if group == "mm_kit.datasets" else ()),
+        lambda: SimpleNamespace(select=lambda group: (entry_point,) if group == "mm_evalkit.datasets" else ()),
     )
 
     adapter = registry.get_dataset("external-set")
@@ -87,10 +87,10 @@ def test_a_plugin_may_not_shadow_a_built_in_dataset(monkeypatch):
     monkeypatch.setattr(
         registry.metadata,
         "entry_points",
-        lambda: SimpleNamespace(select=lambda group: (entry_point,) if group == "mm_kit.datasets" else ()),
+        lambda: SimpleNamespace(select=lambda group: (entry_point,) if group == "mm_evalkit.datasets" else ()),
     )
 
-    assert registry.get_dataset("gait120").module == "mm_kit.workflows.gait"
+    assert registry.get_dataset("gait120").module == "mm_evalkit.workflows.gait"
 
 
 def test_cli_lists_datasets_without_loading_implementations(capsys):

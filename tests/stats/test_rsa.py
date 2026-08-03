@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from mm_kit.stats.rsa import compute_rsm, rsa
+from mm_evalkit.stats.rsa import compute_rsm, rsa
 
 
 def test_compute_rsm_is_the_channel_correlation_matrix():

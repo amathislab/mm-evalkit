@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from mm_kit.activation import (
+from mm_evalkit.activation import (
     activation_sample_phase,
     align_activation_to_observation_timeline,
     complete_activation_gait_indexes,

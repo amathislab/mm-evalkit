@@ -1,4 +1,4 @@
-from mm_kit.datasets.motion_sets import GAIT120_MOTION_SETS, ULTRAMOCAP_MOTION_SETS
+from mm_evalkit.datasets.motion_sets import GAIT120_MOTION_SETS, ULTRAMOCAP_MOTION_SETS
 
 
 def test_gait120_common_testing_set_is_explicit_and_ordered():

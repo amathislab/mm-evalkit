@@ -1,8 +1,8 @@
 import numpy as np
 import pytest
 
-from mm_kit.rendering.models import CameraConfig, RenderClip, SignalComparison
-from mm_kit.rendering.timeline import normalize_shape, resample_profile
+from mm_evalkit.rendering.models import CameraConfig, RenderClip, SignalComparison
+from mm_evalkit.rendering.timeline import normalize_shape, resample_profile
 
 
 def _clip() -> RenderClip:

@@ -1,7 +1,7 @@
 import pytest
 import yaml
 
-from mm_kit.paths import load_path_config, resolve_dataset_path, set_dataset_path
+from mm_evalkit.paths import load_path_config, resolve_dataset_path, set_dataset_path
 
 
 def test_explicit_path_wins_over_environment(tmp_path, monkeypatch):

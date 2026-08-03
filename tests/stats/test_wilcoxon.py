@@ -9,7 +9,7 @@ units/channels only.
 import numpy as np
 import pytest
 
-from mm_kit.stats.wilcoxon import (
+from mm_evalkit.stats.wilcoxon import (
     MetricFamily,
     MetricSamples,
     compare_per_channel,

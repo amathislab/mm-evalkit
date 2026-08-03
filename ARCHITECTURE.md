@@ -1,6 +1,6 @@
-# `mm-kit` architecture
+# `mm-evalkit` architecture
 
-`mm-kit` implements the evaluation benchmark for MuscleMimic policies. It
+`mm-evalkit` implements the evaluation benchmark for MuscleMimic policies. It
 measures kinematic, kinetic, and neuromuscular agreement between rollout NPZ
 files and recorded human data.
 
@@ -88,7 +88,7 @@ CLI / Python API
 ## Source layout
 
 ```text
-mm_kit/
+mm_evalkit/
 ├── cli.py                      # evaluate / render / paths dispatch
 ├── cli_options.py              # shared command-line fields and aliases
 ├── registry.py                 # dataset and renderer discovery
@@ -134,7 +134,7 @@ mm_kit/
 
 ## Workflow state
 
-Gait stages share [`GaitAnalysis`](src/mm_kit/workflows/gait/state.py). It owns:
+Gait stages share [`GaitAnalysis`](src/mm_evalkit/workflows/gait/state.py). It owns:
 
 - validated configuration and channel definitions;
 - the retained human cohort;
@@ -143,11 +143,11 @@ Gait stages share [`GaitAnalysis`](src/mm_kit/workflows/gait/state.py). It owns:
 - population, subject-matched, and reference metrics; and
 - output paths and plot style.
 
-[`load_gait_analysis`](src/mm_kit/workflows/gait/loading.py) performs input I/O
+[`load_gait_analysis`](src/mm_evalkit/workflows/gait/loading.py) performs input I/O
 and constructs this state. Pipeline stages fill declared `slots=True` records.
 
 The bimanual workflow uses typed records in
-[`workflows/bimanual/models.py`](src/mm_kit/workflows/bimanual/models.py) for
+[`workflows/bimanual/models.py`](src/mm_evalkit/workflows/bimanual/models.py) for
 rollouts, trials, repetitions, metrics, and reports.
 
 ## Input contracts
@@ -179,31 +179,31 @@ rollouts, trials, repetitions, metrics, and reports.
 ## Public interfaces
 
 ```bash
-mm-kit evaluate --list-datasets
-mm-kit evaluate gait120 --help
-mm-kit evaluate wang --help
-mm-kit evaluate ultra-mocap --help
-mm-kit render gait120 --help
-mm-kit render ultra-mocap --help
-mm-kit paths show
+mm-evalkit evaluate --list-datasets
+mm-evalkit evaluate gait120 --help
+mm-evalkit evaluate wang --help
+mm-evalkit evaluate ultra-mocap --help
+mm-evalkit render gait120 --help
+mm-evalkit render ultra-mocap --help
+mm-evalkit paths show
 ```
 
 Python callers use the registry directly:
 
 ```python
-from mm_kit import run_dataset
+from mm_evalkit import run_dataset
 
 run_dataset("gait120", ["--help"])
 ```
 
-External packages register benchmark adapters through `mm_kit.datasets` and
-optional visualization adapters through `mm_kit.renderers`. Dataset listing
+External packages register benchmark adapters through `mm_evalkit.datasets` and
+optional visualization adapters through `mm_evalkit.renderers`. Dataset listing
 reads entry-point metadata; adapter modules load when selected. Built-in
 adapter names are reserved.
 
 ## Quality gates
 
-Tests mirror `src/mm_kit/` and use pytest `importlib` mode. The package-wide
+Tests mirror `src/mm_evalkit/` and use pytest `importlib` mode. The package-wide
 commands are:
 
 ```bash

@@ -7,8 +7,8 @@ import numpy as np
 
 matplotlib.use("Agg")
 
-from mm_kit.stats.wilcoxon import MetricSamples
-from mm_kit.workflows.bimanual.statistics import (
+from mm_evalkit.stats.wilcoxon import MetricSamples
+from mm_evalkit.workflows.bimanual.statistics import (
     _aggregate_matched_trials_by_subject,
     run_wilcoxon_tests,
 )

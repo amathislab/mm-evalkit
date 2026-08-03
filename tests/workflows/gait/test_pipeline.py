@@ -10,11 +10,11 @@ import numpy as np
 
 matplotlib.use("Agg")
 
-from mm_kit.workflows.gait import pipeline
-from mm_kit.workflows.gait.human_data import choose_plot_subjects, refresh_human_rsms
-from mm_kit.workflows.gait.kinetics_data import select_kinetics_subset
-from mm_kit.workflows.gait.metrics import compute_rsm
-from mm_kit.workflows.gait.state import KineticsCohort, KineticsCycles, PolicyProfiles
+from mm_evalkit.workflows.gait import pipeline
+from mm_evalkit.workflows.gait.human_data import choose_plot_subjects, refresh_human_rsms
+from mm_evalkit.workflows.gait.kinetics_data import select_kinetics_subset
+from mm_evalkit.workflows.gait.metrics import compute_rsm
+from mm_evalkit.workflows.gait.state import KineticsCohort, KineticsCycles, PolicyProfiles
 
 from .conftest import JOINTS, MUSCLES, make_analysis, make_cohort, make_run
 

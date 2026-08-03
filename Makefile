@@ -11,11 +11,11 @@ PYTEST_ARGS ?=
 help:  ## Show available commands
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  %-18s %s\n", $$1, $$2}'
 
-install:  ## Create the environment and install mm-kit
+install:  ## Create the environment and install mm-evalkit
 	$(UV) venv --python 3.11
 	$(UV) pip install --python $(PYTHON) -e .
 
-install-dev:  ## Install mm-kit with test, lint, and build tools
+install-dev:  ## Install mm-evalkit with test, lint, and build tools
 	$(UV) venv --python 3.11
 	$(UV) pip install --python $(PYTHON) -e '.[dev]'
 
@@ -43,5 +43,6 @@ check: lint test precommit  ## Run all release checks
 
 clean:  ## Remove local build and Python cache artifacts
 	rm -rf build dist .pytest_cache .ruff_cache
+	find src -maxdepth 1 -type d -name '*.egg-info' -prune -exec rm -rf {} +
 	find . -type d -name __pycache__ -prune -exec rm -rf {} +
 	find . -type f -name '*.py[co]' -delete

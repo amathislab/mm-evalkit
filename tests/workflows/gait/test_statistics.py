@@ -6,23 +6,23 @@ import pytest
 
 matplotlib.use("Agg")
 
-from mm_kit.workflows.gait.constants import (
+from mm_evalkit.workflows.gait.constants import (
     BETWEEN_SUBJECT_LABEL,
     EARLIER_HUMAN_SENSITIVITY_LABEL,
     POLICY_WITHIN_SUBJECT_LABEL,
     RSA_NOISE_CEILING_LABEL,
     WITHIN_SUBJECT_LABEL,
 )
-from mm_kit.workflows.gait.plotting.summary import (
+from mm_evalkit.workflows.gait.plotting.summary import (
     REFERENCE_SCOPES,
     _scoped_reference_metrics,
 )
-from mm_kit.workflows.gait.state import (
+from mm_evalkit.workflows.gait.state import (
     PerSubjectMetrics,
     PopulationMetrics,
     SubjectReference,
 )
-from mm_kit.workflows.gait.statistics import compute_wilcoxon_tests
+from mm_evalkit.workflows.gait.statistics import compute_wilcoxon_tests
 
 from .conftest import JOINTS, MUSCLES, SUBJECTS, make_analysis, make_run
 

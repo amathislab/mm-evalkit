@@ -12,20 +12,20 @@ import numpy as np
 import pytest
 import yaml
 
-from mm_kit.datasets import (
+from mm_evalkit.datasets import (
     gait120 as gait120_loader,
 )
-from mm_kit.datasets import wang as wang_loader
-from mm_kit.workflows.gait import analysis as gait_analysis
-from mm_kit.workflows.gait import human_data, main, policy_data
-from mm_kit.workflows.gait.channels import joint_names_myo, muscle_names_myo
-from mm_kit.workflows.gait.cli import build_parser
-from mm_kit.workflows.gait.config import FullBodyConfig
-from mm_kit.workflows.gait.constants import MOTION_SETS
-from mm_kit.workflows.gait.references import (
+from mm_evalkit.datasets import wang as wang_loader
+from mm_evalkit.workflows.gait import analysis as gait_analysis
+from mm_evalkit.workflows.gait import human_data, main, policy_data
+from mm_evalkit.workflows.gait.channels import joint_names_myo, muscle_names_myo
+from mm_evalkit.workflows.gait.cli import build_parser
+from mm_evalkit.workflows.gait.config import FullBodyConfig
+from mm_evalkit.workflows.gait.constants import MOTION_SETS
+from mm_evalkit.workflows.gait.references import (
     compute_subject_profile_metrics,
 )
-from mm_kit.workflows.gait.rollout_validation import validate_rollout_archive
+from mm_evalkit.workflows.gait.rollout_validation import validate_rollout_archive
 
 from .conftest import make_analysis, make_channels, make_cohort, make_run
 

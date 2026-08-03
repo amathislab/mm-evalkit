@@ -8,7 +8,7 @@ matplotlib.use("Agg")
 
 import matplotlib.pyplot as plt
 
-from mm_kit.workflows.gait.plotting.style import draw_grouped_hbar
+from mm_evalkit.workflows.gait.plotting.style import draw_grouped_hbar
 
 from .conftest import make_analysis, make_run
 

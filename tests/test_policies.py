@@ -5,13 +5,13 @@ from pathlib import Path
 import pytest
 import yaml
 
-from mm_kit import config as legacy_config
-from mm_kit.policies import (
+from mm_evalkit import config as legacy_config
+from mm_evalkit.policies import (
     PolicySpec,
     load_policy_specs,
     validate_policy_files,
 )
-from mm_kit.workflows.bimanual.config import (
+from mm_evalkit.workflows.bimanual.config import (
     load_policies as load_bimanual_policies,
 )
 

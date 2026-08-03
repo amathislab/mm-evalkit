@@ -7,9 +7,9 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from mm_kit.datasets.gait120_kinetics import TORQUE_JOINTS
-from mm_kit.policies import PolicySpec
-from mm_kit.workflows.gait.kinetics_data import (
+from mm_evalkit.datasets.gait120_kinetics import TORQUE_JOINTS
+from mm_evalkit.policies import PolicySpec
+from mm_evalkit.workflows.gait.kinetics_data import (
     load_kinetics_cohort,
     load_policy_kinetics,
     select_kinetics_subset,

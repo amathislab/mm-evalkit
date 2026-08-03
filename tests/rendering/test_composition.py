@@ -8,12 +8,12 @@ are covered directly.
 import numpy as np
 import pytest
 
-from mm_kit.rendering.models import CameraConfig, RenderClip, SignalComparison
+from mm_evalkit.rendering.models import CameraConfig, RenderClip, SignalComparison
 
 cv2 = pytest.importorskip("cv2", reason="frame composition needs opencv")
 
-from mm_kit.rendering.layouts import compose_side_by_side  # noqa: E402
-from mm_kit.rendering.panels import SignalPanel  # noqa: E402
+from mm_evalkit.rendering.layouts import compose_side_by_side  # noqa: E402
+from mm_evalkit.rendering.panels import SignalPanel  # noqa: E402
 
 
 def _clip(n_comparisons: int = 2) -> RenderClip:

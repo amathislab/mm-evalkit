@@ -5,8 +5,8 @@ from dataclasses import replace
 import numpy as np
 import pytest
 
-from mm_kit.workflows.gait import metrics
-from mm_kit.workflows.gait.numerics import (
+from mm_evalkit.workflows.gait import metrics
+from mm_evalkit.workflows.gait.numerics import (
     finite_mean,
     paired_pearson,
 )

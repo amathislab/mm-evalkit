@@ -10,10 +10,10 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from mm_kit.policies import PolicySpec
-from mm_kit.workflows.gait.config import FullBodyConfig
-from mm_kit.workflows.gait.loading import build_style
-from mm_kit.workflows.gait.state import (
+from mm_evalkit.policies import PolicySpec
+from mm_evalkit.workflows.gait.config import FullBodyConfig
+from mm_evalkit.workflows.gait.loading import build_style
+from mm_evalkit.workflows.gait.state import (
     GaitAnalysis,
     GaitChannels,
     HumanCohort,

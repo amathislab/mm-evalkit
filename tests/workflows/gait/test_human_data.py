@@ -3,8 +3,8 @@
 import numpy as np
 import pytest
 
-from mm_kit.workflows.gait import human_data
-from mm_kit.workflows.gait.state import PolicyCycles
+from mm_evalkit.workflows.gait import human_data
+from mm_evalkit.workflows.gait.state import PolicyCycles
 
 from .conftest import JOINTS, MUSCLES, make_analysis, make_cohort, make_run
 

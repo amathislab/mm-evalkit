@@ -2,7 +2,7 @@
 
 import pytest
 
-from mm_kit.rendering.cli import build_parser
+from mm_evalkit.rendering.cli import build_parser
 
 
 @pytest.mark.parametrize(

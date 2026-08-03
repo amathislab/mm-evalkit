@@ -9,39 +9,39 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from mm_kit.datasets.ultra_mocap import (
+from mm_evalkit.datasets.ultra_mocap import (
     load_aligned_emg,
 )
-from mm_kit.policies import PolicySpec
-from mm_kit.workflows.bimanual.cli import build_parser
-from mm_kit.workflows.bimanual.metrics import (
+from mm_evalkit.policies import PolicySpec
+from mm_evalkit.workflows.bimanual.cli import build_parser
+from mm_evalkit.workflows.bimanual.metrics import (
     _cycle_mean_std,
     _row_correlations,
     _row_rmse,
     pairwise_corr,
     split_half,
 )
-from mm_kit.workflows.bimanual.models import (
+from mm_evalkit.workflows.bimanual.models import (
     AnalysisConfig,
     RolloutMetadata,
 )
-from mm_kit.workflows.bimanual.muscles import (
+from mm_evalkit.workflows.bimanual.muscles import (
     build_muscle_groups,
 )
-from mm_kit.workflows.bimanual.pipeline import (
+from mm_evalkit.workflows.bimanual.pipeline import (
     analyse_policy,
     validate_comparable_trials,
 )
-from mm_kit.workflows.bimanual.references import (
+from mm_evalkit.workflows.bimanual.references import (
     select_reference_record,
 )
-from mm_kit.workflows.bimanual.rollout import (
+from mm_evalkit.workflows.bimanual.rollout import (
     resolve_trial_stems,
     validate_policy_rollouts,
     validate_rollout,
 )
-from mm_kit.workflows.bimanual.segmentation import select_declared_critical_joint
-from mm_kit.workflows.bimanual.trials import load_trial
+from mm_evalkit.workflows.bimanual.segmentation import select_declared_critical_joint
+from mm_evalkit.workflows.bimanual.trials import load_trial
 
 
 def test_correlations_use_finite_pairs_and_reject_constant_profiles():
@@ -432,7 +432,7 @@ def test_analyse_policy_runs_alignment_segmentation_and_exact_metrics(
         episode_0_traj_qpos=np.zeros((8, 1)),
     )
     monkeypatch.setattr(
-        "mm_kit.workflows.bimanual.trials.select_declared_critical_joint",
+        "mm_evalkit.workflows.bimanual.trials.select_declared_critical_joint",
         lambda *_args, **_kwargs: (
             "shoulder_elv_r",
             1.0,
@@ -540,15 +540,15 @@ def test_arm_swing_segmentation_uses_only_declared_shoulder_elevation(
         )
     )
     monkeypatch.setattr(
-        "mm_kit.workflows.bimanual.segmentation.segment_cycles",
+        "mm_evalkit.workflows.bimanual.segmentation.segment_cycles",
         lambda signal, _fs: [(0, 2), (2, 4), (4, 6)],
     )
     monkeypatch.setattr(
-        "mm_kit.workflows.bimanual.segmentation.cycle_shape_consistency",
+        "mm_evalkit.workflows.bimanual.segmentation.cycle_shape_consistency",
         lambda _signal, _boundaries: 1.0,
     )
     monkeypatch.setattr(
-        "mm_kit.workflows.bimanual.segmentation.periodicity_strength",
+        "mm_evalkit.workflows.bimanual.segmentation.periodicity_strength",
         lambda _signal, _fs: (0.9, 2),
     )
 
@@ -689,7 +689,7 @@ def test_trial_uses_identical_complete_cycles_for_activation_and_emg(
         )
 
     monkeypatch.setattr(
-        "mm_kit.workflows.bimanual.trials.select_declared_critical_joint",
+        "mm_evalkit.workflows.bimanual.trials.select_declared_critical_joint",
         fake_select_declared_critical_joint,
     )
 

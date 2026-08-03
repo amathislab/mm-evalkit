@@ -2,7 +2,7 @@
 
 import pytest
 
-from mm_kit.stats.rsa import compute_rsm
+from mm_evalkit.stats.rsa import compute_rsm
 
 
 class Policy:

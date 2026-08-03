@@ -1,11 +1,12 @@
-# MM-Kit (MuscleMimic Kit)
+# MM-EvalKit (MuscleMimic Evaluation Kit)
 
 <p align="center">
-  <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache%202.0-76B900.svg" alt="License"></a>
+  <a href="https://pypi.org/project/mm-evalkit/"><img src="https://img.shields.io/pypi/v/mm-evalkit.svg" alt="PyPI version"></a>
+  <a href="https://github.com/amathislab/mm-evalkit/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-Apache%202.0-76B900.svg" alt="License"></a>
   <a href="https://arxiv.org/abs/2603.25544"><img src="https://img.shields.io/badge/Preprint-arXiv-b31b1b" alt="Preprint"></a>
 </p>
 
-`mm-kit` is the evaluation benchmark for MuscleMimic policies. It compares
+`mm-evalkit` is the evaluation benchmark for MuscleMimic policies. It compares
 rollout NPZ files with recorded human data at three physiological levels:
 
 - kinematics: joint-angle RMSE and waveform correlation;
@@ -28,27 +29,27 @@ Gait120 provides all three evaluation levels over one retained subject cohort.
 
 ## Install
 
-Create a Python 3.11 environment and install the package from the repository
-root:
+The PyPI distribution is named `mm-evalkit`; it provides the `mm_evalkit` Python
+package and the `mm-evalkit` command-line interface. Install it with Python 3.11 or
+newer:
 
 ```bash
-uv venv --python 3.11
-uv pip install --python .venv/bin/python -e .
+python -m pip install mm-evalkit
 ```
 
 Synchronized visualization requires the `render` extra:
 
 ```bash
-uv pip install --python .venv/bin/python -e '.[render]'
+python -m pip install 'mm-evalkit[render]'
 ```
 
 ## Configure data paths
 
 ```bash
-mm-kit paths set gait120 /absolute/path/to/Gait120
-mm-kit paths set wang /absolute/path/to/Wang
-mm-kit paths set ultra-mocap /absolute/path/to/ULTra-MoCap
-mm-kit paths show
+mm-evalkit paths set gait120 /absolute/path/to/Gait120
+mm-evalkit paths set wang /absolute/path/to/Wang
+mm-evalkit paths set ultra-mocap /absolute/path/to/ULTra-MoCap
+mm-evalkit paths show
 ```
 
 An explicit `--dataset_dir` on an evaluation command overrides the saved path.
@@ -74,7 +75,7 @@ identity. Compared policies must use the same ordered references.
 ### Gait120
 
 ```bash
-mm-kit evaluate gait120 \
+mm-evalkit evaluate gait120 \
   --motion_group GAIT120_TESTING \
   --policy_config_file policies.yaml \
   --plots_dir results/gait120 \
@@ -89,7 +90,7 @@ measurements.
 ### Wang
 
 ```bash
-mm-kit evaluate wang \
+mm-evalkit evaluate wang \
   --policy_config_file policies.yaml \
   --plots_dir results/wang
 ```
@@ -97,7 +98,7 @@ mm-kit evaluate wang \
 ### ULTra-MoCap
 
 ```bash
-mm-kit evaluate ultra-mocap \
+mm-evalkit evaluate ultra-mocap \
   --motion_group ULTRA_MOCAP_BIMANUAL_TESTING_SUBJECTS \
   --policy_config_file policies.yaml \
   --plots_dir results/ultramocap
@@ -107,10 +108,10 @@ Each run requires an empty output directory. Dataset-specific options are
 available through:
 
 ```bash
-mm-kit evaluate --list-datasets
-mm-kit evaluate gait120 --help
-mm-kit evaluate wang --help
-mm-kit evaluate ultra-mocap --help
+mm-evalkit evaluate --list-datasets
+mm-evalkit evaluate gait120 --help
+mm-evalkit evaluate wang --help
+mm-evalkit evaluate ultra-mocap --help
 ```
 
 ## Outputs
@@ -134,23 +135,23 @@ Input archives are validated before analysis starts.
 Renderers synchronize policy motion with human and artificial muscle signals:
 
 ```bash
-mm-kit render gait120 --help
-mm-kit render ultra-mocap --help
+mm-evalkit render gait120 --help
+mm-evalkit render ultra-mocap --help
 ```
 
 ## Demos
 
 ### Overhead reach (`P11_OverheadReach_180`)
 
-![ULTra-MoCap overhead-reach demo](assets/demos/P11_OverheadReach_180_demo.gif)
+![ULTra-MoCap overhead-reach demo](https://raw.githubusercontent.com/amathislab/mm-evalkit/main/assets/demos/P11_OverheadReach_180_demo.gif)
 
 ### Shoulder rotation (`P12_ShoulderRotation_Normal`)
 
-![ULTra-MoCap shoulder-rotation demo](assets/demos/P12_ShoulderRotation_Normal_demo.gif)
+![ULTra-MoCap shoulder-rotation demo](https://raw.githubusercontent.com/amathislab/mm-evalkit/main/assets/demos/P12_ShoulderRotation_Normal_demo.gif)
 
 ### Gait step (`S052_step01`)
 
-![Gait120 step demo](assets/demos/S052_step01_demo.gif)
+![Gait120 step demo](https://raw.githubusercontent.com/amathislab/mm-evalkit/main/assets/demos/S052_step01_demo.gif)
 
 ## Add a dataset
 
@@ -161,20 +162,23 @@ access requirements.
 External packages register adapters in `pyproject.toml`:
 
 ```toml
-[project.entry-points."mm_kit.datasets"]
+[project.entry-points."mm_evalkit.datasets"]
 example = "example_package.cli:main"
 
-[project.entry-points."mm_kit.renderers"]
+[project.entry-points."mm_evalkit.renderers"]
 example = "example_package.render:prepare_clip"
 ```
 
 Validation should cover a minimal valid dataset, malformed inputs, alignment,
 normalization, metrics, registry discovery, and an end-to-end run. The
-[architecture guide](ARCHITECTURE.md) defines the extension boundaries.
+[architecture guide](https://github.com/amathislab/mm-evalkit/blob/main/ARCHITECTURE.md)
+defines the extension boundaries.
 
 ## Development
 
 ```bash
+git clone https://github.com/amathislab/mm-evalkit.git
+cd mm-evalkit
 make install-dev
 make format
 make lint
@@ -184,8 +188,8 @@ make precommit
 
 Ruff and pre-commit cover every Python file in the repository.
 
-See [Architecture](ARCHITECTURE.md) for data flow, module ownership, input
-contracts, and public extension points.
+See [Architecture](https://github.com/amathislab/mm-evalkit/blob/main/ARCHITECTURE.md)
+for data flow, module ownership, input contracts, and public extension points.
 
 ## Citation
 

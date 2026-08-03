@@ -3,9 +3,9 @@
 import numpy as np
 import pytest
 
-from mm_kit.workflows.gait.metrics import compute_rsm
-from mm_kit.workflows.gait.references import compute_policy_to_earlier_human_sensitivity
-from mm_kit.workflows.gait.state import PolicyProfiles
+from mm_evalkit.workflows.gait.metrics import compute_rsm
+from mm_evalkit.workflows.gait.references import compute_policy_to_earlier_human_sensitivity
+from mm_evalkit.workflows.gait.state import PolicyProfiles
 
 from .conftest import make_analysis, make_channels, make_cohort, make_run
 

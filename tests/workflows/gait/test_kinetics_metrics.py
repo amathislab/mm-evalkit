@@ -7,10 +7,10 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from mm_kit.datasets.gait120_kinetics import GRF_CHANNELS, TORQUE_JOINTS
-from mm_kit.workflows.gait.kinetics_data import select_kinetics_subset
-from mm_kit.workflows.gait.kinetics_metrics import compute_kinetics_metrics, write_kinetics_metrics
-from mm_kit.workflows.gait.state import KineticsCohort, KineticsCycles
+from mm_evalkit.datasets.gait120_kinetics import GRF_CHANNELS, TORQUE_JOINTS
+from mm_evalkit.workflows.gait.kinetics_data import select_kinetics_subset
+from mm_evalkit.workflows.gait.kinetics_metrics import compute_kinetics_metrics, write_kinetics_metrics
+from mm_evalkit.workflows.gait.state import KineticsCohort, KineticsCycles
 
 from .conftest import make_analysis, make_cohort, make_run
 

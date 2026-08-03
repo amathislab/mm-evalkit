@@ -7,7 +7,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from mm_kit.datasets.gait120_kinetics import (
+from mm_evalkit.datasets.gait120_kinetics import (
     GRF_CHANNELS,
     TORQUE_JOINTS,
     left_heel_strike_windows,

@@ -8,11 +8,11 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from mm_kit.policies import PolicySpec
-from mm_kit.workflows.gait.human_data import (
+from mm_evalkit.policies import PolicySpec
+from mm_evalkit.workflows.gait.human_data import (
     use_reference_as_joint_ground_truth,
 )
-from mm_kit.workflows.gait.rollout_validation import (
+from mm_evalkit.workflows.gait.rollout_validation import (
     validate_policy_rollouts,
 )
 

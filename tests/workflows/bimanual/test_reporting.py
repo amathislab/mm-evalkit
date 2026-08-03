@@ -6,9 +6,9 @@ import pytest
 
 matplotlib.use("Agg")
 
-from mm_kit.workflows.bimanual.metrics import pairwise_rsa
-from mm_kit.workflows.bimanual.rsm_plots import plot_rsm_matrices
-from mm_kit.workflows.bimanual.tables import (
+from mm_evalkit.workflows.bimanual.metrics import pairwise_rsa
+from mm_evalkit.workflows.bimanual.rsm_plots import plot_rsm_matrices
+from mm_evalkit.workflows.bimanual.tables import (
     _condition_scores,
     _format_cell,
     _mean_std,
