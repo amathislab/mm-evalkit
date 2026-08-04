@@ -4,6 +4,7 @@
   <a href="https://pypi.org/project/mm-evalkit/"><img src="https://img.shields.io/pypi/v/mm-evalkit.svg" alt="PyPI version"></a>
   <a href="https://github.com/amathislab/mm-evalkit/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-Apache%202.0-76B900.svg" alt="License"></a>
   <a href="https://arxiv.org/abs/2603.25544"><img src="https://img.shields.io/badge/Preprint-arXiv-b31b1b" alt="Preprint"></a>
+  <a href="https://huggingface.co/collections/amathislab/musclemimic"><img src="https://img.shields.io/badge/-HF%20Assets-FFD21E?logo=huggingface&amp;logoColor=000" alt="HF Assets"></a>
 </p>
 
 `mm-evalkit` is the evaluation benchmark for MuscleMimic policies. It compares
