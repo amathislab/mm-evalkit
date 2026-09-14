@@ -32,6 +32,7 @@ from .motion_identity import subject_from_trajectory, trial_from_trajectory
 from .numerics import finite_mean
 from .rollout_validation import has_embedded_kinetics
 from .state import KineticsCohort, KineticsCycles, KineticsOmission, KineticsProfiles, PolicyRun
+from .world_grf import load_world_grf
 
 _REFERENCE_NAME = re.compile(r"^(?P<subject>S\d{3})_Trial\d{2}_Step01_Step02$")
 _SUMMARY_TORQUE_UNITS = {"nm_per_kg", "nm/kg"}
@@ -439,15 +440,17 @@ def _load_rollout_policy_kinetics(
                 if name.startswith("knee_angle_"):
                     policy_torque[:, index] *= -1.0
             selected_sensors = raw_sensors[:, sensor_indexes]
-            policy_grf = (
-                np.column_stack(
-                    [
-                        selected_sensors[:, 2] + selected_sensors[:, 3],
-                        selected_sensors[:, 0] + selected_sensors[:, 1],
-                    ]
+            policy_grf = load_world_grf(data, prefix, len(raw_torque), path)
+            if policy_grf is None:
+                policy_grf = (
+                    np.column_stack(
+                        [
+                            selected_sensors[:, 2] + selected_sensors[:, 3],
+                            selected_sensors[:, 0] + selected_sensors[:, 1],
+                        ]
+                    )
+                    / model_body_weight_n
                 )
-                / model_body_weight_n
-            )
             if policy.kinetics_swap_left_right:
                 policy_torque = _swap_torque_sides(policy_torque)
                 policy_grf = policy_grf[:, ::-1]

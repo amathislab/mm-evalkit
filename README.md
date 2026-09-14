@@ -92,6 +92,11 @@ policy joint-force and foot-contact-force signals. Human joint moments come
 from inverse dynamics; human GRF comes from corrected Gait120 force-plate
 measurements.
 
+MuscleMimic exports these signals with `fullbody.eval --use_mujoco
+--export_trajectory --export_kinetics`. Activation is sampled before each control
+step. GRF is saved in world coordinates at both control and physics frequency.
+Gait120 compares the control-rate vertical GRF, normalized by body weight.
+
 ### Wang
 
 ```bash

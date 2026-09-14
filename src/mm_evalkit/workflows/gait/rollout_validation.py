@@ -10,6 +10,8 @@ import numpy as np
 from mm_evalkit.activation import activation_sample_phase
 from mm_evalkit.policies import PolicySpec
 
+from .world_grf import load_world_grf
+
 EPISODE_FIELDS = (
     "traj_id",
     "traj_length",
@@ -234,6 +236,7 @@ def validate_rollout_archive(
             )
 
         if embedded_kinetics:
+            load_world_grf(archive, prefix, joint_length, source)
             kinetics_keys = [f"{prefix}_{field}" for field in KINETICS_EPISODE_FIELDS]
             missing_kinetics = [key for key in kinetics_keys if key not in archive]
             if missing_kinetics:

@@ -159,6 +159,37 @@ def test_generic_rollout_embeds_raw_kinetics_without_a_separate_policy_summary(t
     assert result.omissions == ()
 
 
+@pytest.mark.parametrize("gravity", [[0, 0, -10], [0, -10, 0]])
+def test_world_grf_takes_precedence_and_uses_saved_gravity(tmp_path: Path, gravity) -> None:
+    root = tmp_path / "references"
+    _write_reference(root / "S012" / "S012_Trial05_Step01_Step02.npz")
+    path = tmp_path / "rollout.npz"
+    _write_embedded_rollout(path)
+    with np.load(path) as archive:
+        data = dict(archive)
+    up = -np.asarray(gravity) / 10.0
+    data.update(
+        grf_coordinate_frame="world",
+        grf_units="N",
+        grf_sides=np.array(["right", "left"]),
+        grf_sample_phase="solver_interval",
+        grf_control_reduction="last_physics_step",
+        gravity_m_s2=np.array(gravity),
+        episode_0_ground_reaction_forces=np.broadcast_to(np.array([300.0, 400.0])[:, None] * up, (200, 2, 3)),
+        episode_0_kinetics_interval_start_times=np.arange(200) * 0.01,
+        episode_0_kinetics_interval_end_times=np.arange(200) * 0.01 + 0.002,
+    )
+    np.savez(path, **data)
+    policy = PolicySpec(id="policy", label="Policy", trajectory_path=path, color="blue")
+    result = load_policy_kinetics(policy, reference_dir=root, motion_list=("dataset/S012/Trial05/motion",))
+    np.testing.assert_allclose(result.cycles.grf[:, 0], 4.0)
+    np.testing.assert_allclose(result.cycles.grf[:, 1], 3.0)
+    data["grf_units"] = "BW"
+    np.savez(path, **data)
+    with pytest.raises(ValueError, match="grf_units"):
+        load_policy_kinetics(policy, reference_dir=root, motion_list=("dataset/S012/Trial05/motion",))
+
+
 def test_embedded_rollout_records_a_missing_reference_as_an_omission(tmp_path: Path) -> None:
     rollout = tmp_path / "rollout.npz"
     _write_embedded_rollout(rollout)
