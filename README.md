@@ -32,6 +32,32 @@ its original archive and cite its accompanying paper using the entries in
 
 Gait120 provides all three evaluation levels over one retained subject cohort.
 
+### Gait120 inputs
+
+The Gait120 loader does **not** read the original figshare archive directly. It
+expects the cleaned redistribution, which carries the per-subject layout the
+readers resolve (`Gait120_###_to_###/S###/EMG/ConvertedData.mat` and
+`JointAngle/LevelWalking/Trial##/step##.mot`):
+
+```bash
+hf download amathislab/Gait120-EMG --repo-type dataset --local-dir /path/to/Gait120
+```
+
+The kinetics layer needs a second archive. Human joint moments come from
+OpenSim inverse dynamics and human GRF from corrected force-plate recordings;
+neither is part of the Gait120 release, and both are published separately as
+per-subject, per-trial NPZ files (`S###/S###_Trial##_Step01_Step02.npz`):
+
+```bash
+hf download amathislab/Boo_LevelWalking --repo-type dataset --local-dir /path/to/gait120-kinetics
+```
+
+Both are redistributions of the original datasets under their own licenses.
+Cite the original authors listed in
+[Citation and dataset credit](#citation-and-dataset-credit), not the mirrors.
+The `hf` command ships with `huggingface_hub`; install it with
+`python -m pip install huggingface_hub` if it is not already available.
+
 ## Install
 
 The PyPI distribution is named `mm-evalkit`; it provides the `mm_evalkit` Python
@@ -90,7 +116,13 @@ mm-evalkit evaluate gait120 \
 `--kinetics_reference_dir` enables the kinetics layer. The rollout NPZ provides
 policy joint-force and foot-contact-force signals. Human joint moments come
 from inverse dynamics; human GRF comes from corrected Gait120 force-plate
-measurements.
+measurements. Both directories come from the archives in
+[Gait120 inputs](#gait120-inputs); the dataset path is the cleaned
+redistribution rather than the original figshare download.
+
+Supplying `--kinetics_reference_dir` restricts every layer to the subjects that
+have an inverse-dynamics trial, because one cohort is shared across layers. A
+kinematics-and-EMG run without it therefore reports a larger subject count.
 
 MuscleMimic exports these signals with `fullbody.eval --use_mujoco
 --export_trajectory --export_kinetics`. Activation is sampled before each control
@@ -139,6 +171,87 @@ Gait120 kinetics writes `kinetics_profiles.svg`, `kinetics_metrics.svg`,
 
 Each dataset command documents its complete configuration through `--help`.
 Input archives are validated before analysis starts.
+
+## Comparison figure
+
+`figures/plot_gait120_comparison.py` draws one Gait120 figure covering all three
+physiological levels for any number of policies: right-limb joint angles, the
+matching joint moments and vertical GRF, muscle activation against normalized
+EMG, and subject-matched Pearson *r* and RMSE for each layer.
+
+The script imports `mm_evalkit` from an installed package, or from `src/` when
+run inside a checkout. It needs the runtime dependencies either way, so install
+the package first if the import fails:
+
+```bash
+python -m pip install -e .
+```
+
+Point `--dataset_dir` and `--kinetics_reference_dir` at the two archives from
+[Gait120 inputs](#gait120-inputs). `figures/policies.example.yaml` is a
+template: copy it and edit each `trajectory_data_path` to your own rollouts,
+since the paths it ships with are placeholders.
+
+```bash
+python figures/plot_gait120_comparison.py \
+  --dataset_dir /path/to/Gait120 \
+  --kinetics_reference_dir /path/to/gait120-kinetics \
+  --policy_config_file figures/policies.example.yaml \
+  --output_dir results/figure
+```
+
+It writes `gait120_comparison.{png,svg,pdf}` and `gait120_comparison_metrics.csv`,
+which carries every plotted mean, SD and per-subject value. The analysis stage
+takes several minutes, so its result is cached beside the output; pass
+`--refresh` after changing the policies or the data.
+
+Human data is drawn as one grey trace per retained subject rather than a mean
+with a spread band, and policy profiles are drawn without a band. Colours and
+line styles come from the policy YAML, so restyling means editing that file
+rather than the script. `figures/policies.example.yaml` documents the palette
+choice, including why the green entry also carries a dashed line style.
+
+### Aligning a rollout first
+
+Compared rollouts must share one ordered motion group. Some exports carry an
+unaligned `episode_N_traj_qpos`, the reference trajectory the policy tracks, in
+which the coupled MyoFullBody knee's dependent degrees of freedom have not been
+recomputed. Copy an aligned reference into such an archive with:
+
+```bash
+python figures/align_rollout.py \
+  --source rollouts/new_policy.npz \
+  --reference rollouts/aligned_policy.npz \
+  --output rollouts/new_policy_aligned.npz
+```
+
+Only `traj_qpos` is rewritten, and only after both archives are checked to agree
+on episode count, joint names, motion names, and the trajectory each episode
+refers to. Pass `--verify-against` a second aligned archive to confirm the
+reference is policy-independent before it is copied.
+
+Alignment changes only analyses that read the retargeted reference, namely
+`--kinematics_source mfb-retargeted` and the synchronized renderers. The default
+`opensim-ik` comparison takes its ground truth from the human dataset and is
+unaffected.
+
+### Reading the figure
+
+Two properties of the Gait120 inputs belong in any caption:
+
+- **Cohort.** Supplying `--kinetics_reference_dir` restricts every layer to the
+  subjects that have an inverse-dynamics trial, because one cohort is shared
+  across layers. Kinematics and EMG alone are available for more subjects, so a
+  kinematics-only run reports a larger *n* than this figure.
+- **Phase reference.** Joint-angle and EMG cycles run right-heel-strike to
+  right-heel-strike, while the moment and GRF references are cut as a fixed
+  1.00 s window from *left* heel strike. The kinetics row therefore sits roughly
+  half a cycle out of phase with the other two and is not a stride-normalized
+  cycle. Metrics are unaffected, since human and policy data share one phase
+  convention within each layer.
+
+Muscle activity is scored by correlation only: normalized EMG and simulated
+activation share no common scale.
 
 ## Synchronized visualization
 
