@@ -5,6 +5,16 @@ from __future__ import annotations
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.colors import to_rgba
+from matplotlib.patches import Patch
+
+from mm_evalkit.plotting import (
+    AXIS_LABEL_SIZE,
+    FIGURE_TITLE_SIZE,
+    LEGEND_SIZE,
+    PANEL_TITLE_SIZE,
+    TICK_SIZE,
+    full_page,
+)
 
 from ..constants import (
     BETWEEN_SUBJECT_HATCH,
@@ -13,8 +23,6 @@ from ..constants import (
     POLICY_WITHIN_SUBJECT_HATCH,
     POLICY_WITHIN_SUBJECT_LABEL,
     REF_GREY,
-    RSA_NOISE_CEILING_HATCH,
-    RSA_NOISE_CEILING_LABEL,
     WITHIN_SUBJECT_HATCH,
     WITHIN_SUBJECT_LABEL,
 )
@@ -23,7 +31,6 @@ from .style import policy_color_rgba
 REFERENCE_SCOPES = {
     WITHIN_SUBJECT_LABEL: "subject_matched",
     BETWEEN_SUBJECT_LABEL: "population",
-    RSA_NOISE_CEILING_LABEL: "subject_matched",
     POLICY_WITHIN_SUBJECT_LABEL: "subject_matched",
     EARLIER_HUMAN_SENSITIVITY_LABEL: "subject_matched",
 }
@@ -50,8 +57,7 @@ def plot_metrics_table(analysis):
 
     One primary row per policy plus its available sensitivity/reference rows, preceded
     by the grey human reference benchmarks: human within-subject reliability (Trial 5
-    vs Trials 1-4), between-subject pairwise similarity, and the RSA leave-one-subject-out
-    noise ceiling. Each policy is followed by the subject-matched sensitivity analysis
+    vs Trials 1-4) and between-subject pairwise similarity. Each policy is followed by the subject-matched sensitivity analysis
     (Policy Trial 5 vs mean Human Trials 1-4) and its optional within-subject variability
     reference (Policy Trial 5 vs its Trials 1-4 rollouts). Metrics are grouped in columns
     as Kinematics (joint angle RMSE), optional Kinetics (joint-moment and vertical-GRF
@@ -132,19 +138,31 @@ def plot_metrics_table(analysis):
     # own within-subject variability bound is a grey row beneath that policy.
     rows = []
 
-    # Within-subject reliability: the appropriate subject-matched upper bound.
+    # Within-subject reliability: the appropriate subject-matched upper bound. Its
+    # kinetic half is scored over the kinetics cohort's own subjects (only part of the
+    # Gait120 release ships Trials 1-4 moments/GRF), so it is carried separately and
+    # each column reports the mean over whichever subjects it could be computed for.
     wref = analysis.references.within_subject
-    if wref and wref.n > 0:
-        w_kin = (np.nanmean(wref.joint_rmse["all_joints"]), wref.joint_rmse["all_joints"])
-        w_emg = (np.nanmean(wref.muscle_corr["all_muscles"]), wref.muscle_corr["all_muscles"])
-        w_rsa = (np.nanmean(wref.rsa_spearman), wref.rsa_spearman)
+    wkin = analysis.references.kinetics_within_subject
+    if wkin is not None:
+        w_torque = (wkin.avg_torque_rmse["all_moments"], wkin.torque_rmse["all_moments"])
+        w_grf = (wkin.avg_grf_rmse["all_grf"], wkin.grf_rmse["all_grf"])
+    else:
+        w_torque = w_grf = nan_metric
+    has_within = bool(wref and wref.n > 0)
+    if has_within or wkin is not None:
+        w_kin = (np.nanmean(wref.joint_rmse["all_joints"]), wref.joint_rmse["all_joints"]) if has_within else nan_metric
+        w_emg = (
+            (np.nanmean(wref.muscle_corr["all_muscles"]), wref.muscle_corr["all_muscles"]) if has_within else nan_metric
+        )
+        w_rsa = (np.nanmean(wref.rsa_spearman), wref.rsa_spearman) if has_within else nan_metric
         rows.append(
             _ref_row(
                 WITHIN_SUBJECT_LABEL,
                 WITHIN_SUBJECT_HATCH,
                 _scoped_reference_metrics(
                     REFERENCE_SCOPES[WITHIN_SUBJECT_LABEL],
-                    _layer_metrics(w_kin, w_emg, w_rsa),
+                    _layer_metrics(w_kin, w_emg, w_rsa, torque=w_torque, grf=w_grf),
                     empty_metric=nan_metric,
                 ),
             )
@@ -161,21 +179,8 @@ def plot_metrics_table(analysis):
             ),
         )
     )
-    # RSA noise ceiling (leave-one-subject-out): applies to the RSA column only.
-    nc = analysis.references.rsa_noise_ceiling
-    if nc and nc.n > 0:
-        nc_rsa = (np.nanmean(nc.rsa_spearman), nc.rsa_spearman)
-        rows.append(
-            _ref_row(
-                RSA_NOISE_CEILING_LABEL,
-                RSA_NOISE_CEILING_HATCH,
-                _scoped_reference_metrics(
-                    REFERENCE_SCOPES[RSA_NOISE_CEILING_LABEL],
-                    _layer_metrics(nan_metric, nan_metric, nc_rsa),
-                    empty_metric=nan_metric,
-                ),
-            )
-        )
+    # Keep the RSA noise ceiling in the statistical/reference state, but omit it from
+    # this compact table for now. It remains visible in the aggregate bar summary.
 
     for policy_idx, run in enumerate(analysis.policies):
         label = run.policy.label
@@ -243,6 +248,7 @@ def plot_metrics_table(analysis):
                 "is_ref": False,
                 "hatch": None,
                 "policy_idx": policy_idx,
+                "is_sensitivity": False,
             }
         )
 
@@ -274,6 +280,7 @@ def plot_metrics_table(analysis):
                     "is_ref": False,
                     "hatch": None,
                     "policy_idx": policy_idx,
+                    "is_sensitivity": True,
                 }
             )
 
@@ -373,7 +380,14 @@ def plot_metrics_table(analysis):
             cell.set_edgecolor("silver")
             cell.set_hatch(row["hatch"])
         else:
-            cell.set_facecolor(policy_color_rgba(analysis, row["policy_idx"]))
+            if row.get("is_sensitivity", False):
+                # Sensitivity is an alternate human reference, not the primary policy score.
+                policy = analysis.policies[row["policy_idx"]].policy
+                cell.set_facecolor(to_rgba(policy.color, 0.22))
+                cell.set_edgecolor(policy.color)
+                cell.set_hatch("//")
+            else:
+                cell.set_facecolor(policy_color_rgba(analysis, row["policy_idx"]))
         cell.set_text_props(ha="left", fontsize=8)
 
     # Overlay the metric-group names centered across each analysis-scope pair.
@@ -412,3 +426,167 @@ def plot_metrics_table(analysis):
     fig.savefig(f"{analysis.plots_dir}/metrics_summary_table.png", dpi=200, bbox_inches="tight")
     plt.close(fig)
     print(f"Saved metrics summary table to {analysis.plots_dir}/metrics_summary_table.svg")
+
+
+def _mean_ci(values) -> tuple[float, float]:
+    """Return a finite-sample mean and normal-approximation 95% CI half-width."""
+    samples = np.asarray(values, dtype=float).ravel()
+    samples = samples[np.isfinite(samples)]
+    if len(samples) == 0:
+        return np.nan, np.nan
+    if len(samples) == 1:
+        return float(samples[0]), 0.0
+    return float(np.mean(samples)), float(1.96 * np.std(samples, ddof=1) / np.sqrt(len(samples)))
+
+
+def plot_metrics_bars(analysis) -> None:
+    """Summarize every aggregate metric and scope with 95% confidence intervals."""
+    within = analysis.references.within_subject
+    subject_enabled = analysis.subject_based
+    metrics = [
+        {
+            "title": "Joint angle error",
+            "unit": "RMSE [deg]",
+            "population_ref": analysis.human_metrics.pairwise_joint_rmse["all_joints"],
+            "subject_ref": within.joint_rmse["all_joints"] if within else [],
+            "population": [run.population.joint_rmse["all_joints"] for run in analysis.policies],
+            "subject": [
+                run.per_subject.joint_rmse["all_joints"] if subject_enabled else [] for run in analysis.policies
+            ],
+        },
+        {
+            "title": "EMG-muscle similarity",
+            "unit": "Pearson r",
+            "population_ref": analysis.human_metrics.pairwise_muscle_corr["all_muscles"],
+            "subject_ref": within.muscle_corr["all_muscles"] if within else [],
+            "population": [run.population.muscle_corr["all_muscles"] for run in analysis.policies],
+            "subject": [
+                run.per_subject.muscle_corr["all_muscles"] if subject_enabled else [] for run in analysis.policies
+            ],
+        },
+        {
+            "title": "EMG-muscle RSA",
+            "unit": "Spearman r",
+            "population_ref": analysis.human_metrics.rsa_matrix[
+                np.tril_indices_from(analysis.human_metrics.rsa_matrix, k=-1)
+            ],
+            "subject_ref": within.rsa_spearman if within else [],
+            # "noise_ceiling": (
+            #     analysis.references.rsa_noise_ceiling.rsa_spearman
+            #     if analysis.references.rsa_noise_ceiling is not None
+            #     else []
+            # ),
+            "noise_ceiling": [],
+            "population": [run.population.rsa_matrix.ravel() for run in analysis.policies],
+            "subject": [run.per_subject.rsa if subject_enabled else [] for run in analysis.policies],
+        },
+    ]
+    if analysis.kinetics is not None:
+        human = analysis.kinetics_human_metrics
+        if human is None:
+            raise RuntimeError("Kinetics metrics have not been computed.")
+        # Within-subject kinetic reliability exists only for the subjects whose Trials
+        # 1-4 moments/GRF ship with the release; it is empty when none of them do.
+        kinetics_within = analysis.references.kinetics_within_subject
+        metrics[1:1] = [
+            {
+                "title": "Joint moment error",
+                "unit": "RMSE [Nm/kg]",
+                "population_ref": human.torque_rmse["all_moments"],
+                "subject_ref": kinetics_within.torque_rmse["all_moments"] if kinetics_within else [],
+                "population": [run.kinetics_population.torque_rmse["all_moments"] for run in analysis.policies],
+                "subject": [
+                    run.kinetics_per_subject.torque_rmse["all_moments"] if subject_enabled else []
+                    for run in analysis.policies
+                ],
+            },
+            {
+                "title": "Vertical GRF error",
+                "unit": "RMSE [BW]",
+                "population_ref": human.grf_rmse["all_grf"],
+                "subject_ref": kinetics_within.grf_rmse["all_grf"] if kinetics_within else [],
+                "population": [run.kinetics_population.grf_rmse["all_grf"] for run in analysis.policies],
+                "subject": [
+                    run.kinetics_per_subject.grf_rmse["all_grf"] if subject_enabled else [] for run in analysis.policies
+                ],
+            },
+        ]
+
+    # Keep all metric families on one row so population/subject-matched bars and
+    # their reference ceilings can be scanned horizontally in one comparison.
+    n_columns = len(metrics)
+    fig, axes = plt.subplots(1, n_columns, figsize=(6.0 * n_columns, 6), squeeze=False)
+    # The scope swatches are grey: the bars encode the policy in their color, so a
+    # policy-colored legend key would read as belonging to one specific policy.
+    handles: dict[str, object] = {
+        "Population": Patch(facecolor=to_rgba("0.35", 0.8), edgecolor="0.35", linewidth=1.5),
+        "Subject-matched": Patch(facecolor="none", edgecolor="0.35", linewidth=1.5),
+    }
+    for metric_index, metric in enumerate(metrics):
+        ax = axes.flat[metric_index]
+        positions = np.arange(len(analysis.policies))
+        width = 0.36
+        for policy_index, run in enumerate(analysis.policies):
+            pop_mean, pop_ci = _mean_ci(metric["population"][policy_index])
+            sub_mean, sub_ci = _mean_ci(metric["subject"][policy_index])
+            # Both scopes take the policy's config color and linestyle; the fill alpha is
+            # the shared same-color/different-linestyle mapping used everywhere else.
+            # Population bars are filled, subject-matched bars are left empty, so the
+            # scope reads as fill-vs-outline without borrowing a reference hatch.
+            ax.bar(
+                positions[policy_index] - width / 2,
+                pop_mean,
+                width,
+                yerr=pop_ci,
+                capsize=4,
+                color=policy_color_rgba(analysis, policy_index),
+                edgecolor=run.policy.color,
+                linestyle=run.policy.linestyle,
+                linewidth=1.5,
+                label="Population",
+            )
+            ax.bar(
+                positions[policy_index] + width / 2,
+                sub_mean,
+                width,
+                yerr=sub_ci,
+                capsize=4,
+                color="none",
+                edgecolor=run.policy.color,
+                linestyle=run.policy.linestyle,
+                linewidth=1.5,
+                label="Subject-matched",
+            )
+
+        for key, label, style in (
+            ("population_ref", "Between-subject reference", {"color": "0.35", "linestyle": "--"}),
+            ("subject_ref", "Within-subject ceiling", {"color": "0.15", "linestyle": ":"}),
+            ("noise_ceiling", "RSA noise ceiling", {"color": "0.15", "linestyle": "-."}),
+        ):
+            mean, ci = _mean_ci(metric.get(key, []))
+            if not np.isfinite(mean):
+                continue
+            line = ax.axhline(mean, linewidth=1.6, label=label, **style)
+            ax.axhspan(mean - ci, mean + ci, color=style["color"], alpha=0.10)
+            handles.setdefault(label, line)
+
+        ax.set_title(metric["title"], fontsize=full_page(PANEL_TITLE_SIZE))
+        ax.set_ylabel(metric["unit"], fontsize=full_page(AXIS_LABEL_SIZE))
+        ax.set_xticks(positions, [f"P{index + 1}" for index in positions], fontsize=full_page(TICK_SIZE))
+        ax.tick_params(labelsize=full_page(TICK_SIZE))
+        ax.spines[["top", "right"]].set_visible(False)
+        ax.grid(axis="y", alpha=0.25, zorder=0)
+
+    fig.legend(
+        handles.values(),
+        handles.keys(),
+        loc="upper center",
+        ncol=len(handles),
+        frameon=False,
+        fontsize=full_page(LEGEND_SIZE),
+    )
+    fig.suptitle("Aggregate gait metrics (bars: mean ± 95% CI)", fontsize=full_page(FIGURE_TITLE_SIZE), y=0.92)
+    fig.tight_layout(rect=(0, 0, 1, 0.92))
+    fig.savefig(analysis.plots_dir / "metrics_summary_bars.svg", bbox_inches="tight")
+    fig.savefig(analysis.plots_dir / "metrics_summary_bars.png", dpi=200, bbox_inches="tight")
+    plt.close(fig)

@@ -10,7 +10,6 @@ from mm_evalkit.workflows.gait.constants import (
     BETWEEN_SUBJECT_LABEL,
     EARLIER_HUMAN_SENSITIVITY_LABEL,
     POLICY_WITHIN_SUBJECT_LABEL,
-    RSA_NOISE_CEILING_LABEL,
     WITHIN_SUBJECT_LABEL,
 )
 from mm_evalkit.workflows.gait.plotting.summary import (
@@ -31,7 +30,6 @@ def test_summary_references_occupy_only_their_defined_scope():
     assert REFERENCE_SCOPES == {
         WITHIN_SUBJECT_LABEL: "subject_matched",
         BETWEEN_SUBJECT_LABEL: "population",
-        RSA_NOISE_CEILING_LABEL: "subject_matched",
         POLICY_WITHIN_SUBJECT_LABEL: "subject_matched",
         EARLIER_HUMAN_SENSITIVITY_LABEL: "subject_matched",
     }
@@ -43,13 +41,6 @@ def test_summary_references_occupy_only_their_defined_scope():
 
     assert [np.isfinite(metric[0]) for metric in population] == [True, False, True, False, True, False]
     assert [np.isfinite(metric[0]) for metric in subject_matched] == [False, True, False, True, False, True]
-
-    noise_ceiling = _scoped_reference_metrics(
-        REFERENCE_SCOPES[RSA_NOISE_CEILING_LABEL],
-        [empty, empty, metrics[2]],
-        empty_metric=empty,
-    )
-    assert [np.isfinite(metric[0]) for metric in noise_ceiling] == [False, False, False, False, False, True]
 
     with pytest.raises(ValueError, match="Unknown summary-table reference scope"):
         _scoped_reference_metrics("both", metrics, empty_metric=empty)

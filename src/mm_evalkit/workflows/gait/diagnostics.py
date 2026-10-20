@@ -52,7 +52,7 @@ def build_and_save_gait_count_table(analysis):
     subject_traj_len = {}  # subject -> reference trajectory length (timesteps in trial 5)
     for policy_idx, run in enumerate(analysis.policies):
         policy = run.policy
-        label = " ".join(policy.label.split())
+        policy_key = policy.id
         short_label = f"P{policy_idx + 1}"
         color = policy.color
         # Same fill alpha the bar plots / metrics table use, so two policies sharing a
@@ -73,7 +73,7 @@ def build_and_save_gait_count_table(analysis):
 
         max_rollouts = max((len(v) for v in per_subject_rollouts.values()), default=0)
         for r in range(max_rollouts):
-            col = (label, f"rollout_{r}")
+            col = (policy_key, f"rollout_{r}")
             columns.append(col)
             counts, details, reasons = [], [], []
             for s in subjects:
@@ -94,7 +94,7 @@ def build_and_save_gait_count_table(analysis):
             col_colors.append(color)
             col_alphas.append(alpha)
             col_is_total.append(False)
-        total_col = (label, "total")
+        total_col = (policy_key, "total")
         columns.append(total_col)
         totals = [int(sum(n for n, _, _ in per_subject_rollouts[s])) for s in subjects]
         data[total_col] = totals
@@ -284,7 +284,7 @@ def render_gait_count_table_png(
             cell.set_text_props(fontweight="bold")
 
     # Legend expanding the P1, P2, ... short labels to the full policy descriptions.
-    legend_lines = [f"P{i + 1}: {' '.join(run.policy.label.split())}" for i, run in enumerate(analysis.policies)]
+    legend_lines = [f"P{i + 1}: {run.policy.id} ({analysis.config.emg_signal}) — {' '.join(run.policy.label.split())}" for i, run in enumerate(analysis.policies)]
     colors = [run.policy.color for run in analysis.policies]
     for i, (line, color) in enumerate(zip(legend_lines, colors, strict=True)):
         fig.text(0.01, -0.02 - 0.035 * i, line, fontsize=7, color=color, va="top", ha="left")

@@ -10,6 +10,20 @@ import numpy as np
 from .style import add_policy_title, add_policy_ytick_markers, draw_rsm
 
 
+def _subject_labels(analysis, n_subjects: int) -> list[str]:
+    """Tick labels for the human rows of an RSA matrix.
+
+    A population-only cohort (Wang) leaves ``subjects`` empty because the
+    per-subject stages key off it, so the loaded identities are read from
+    ``all_subjects``. If neither lines up with the matrix, the rows are numbered
+    rather than labelled with a subject ID the cohort does not carry.
+    """
+    identities = list(analysis.human.subjects) or list(analysis.human.all_subjects)
+    if len(identities) != n_subjects:
+        return [f"#{position + 1}" for position in range(n_subjects)]
+    return [f"Subj {identity}" for identity in identities]
+
+
 def plot_rsa_results(analysis):
     """Generate plots for RSA results."""
     fig = plt.figure(figsize=(12, 10))
@@ -26,7 +40,7 @@ def plot_rsa_results(analysis):
     n_subjects = len(analysis.human_metrics.rsa_matrix)
     annotate = n_subjects <= analysis.style.rsa_matrix_annotate_max
     if annotate:
-        subject_labels = [f"Subj {analysis.human.subjects[i]}" for i in range(n_subjects)]
+        subject_labels = _subject_labels(analysis, n_subjects)
         plt.xticks(np.arange(n_subjects), subject_labels, rotation=45)
         # The policy rows get a colored square instead of a text label.
         plt.yticks(
@@ -109,7 +123,7 @@ def plot_subject_based_rsa_results(analysis):
     n_subjects = len(analysis.human_metrics.rsa_matrix)
     annotate = n_subjects <= analysis.style.rsa_matrix_annotate_max
     if annotate:
-        subject_labels = [f"Subj {analysis.human.subjects[i]}" for i in range(n_subjects)]
+        subject_labels = _subject_labels(analysis, n_subjects)
         plt.xticks(np.arange(n_subjects), subject_labels, rotation=45)
         # The policy rows get a colored square instead of a text label.
         plt.yticks(

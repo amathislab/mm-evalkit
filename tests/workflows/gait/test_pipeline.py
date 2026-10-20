@@ -76,6 +76,7 @@ def test_every_stage_runs_and_writes_its_artifacts(tmp_path):
     # ...and each family of figures reached disk.
     written = {path.name for path in tmp_path.iterdir()}
     assert "metrics_summary_table.png" in written
+    assert "metrics_summary_bars.png" in written
     assert "wilcoxon_tests.csv" in written
     assert {name for name in written if name.startswith("wilcoxon_") and name.endswith(".png")}
     assert {name for name in written if name.endswith(".png")} - {"metrics_summary_table.png"}
@@ -138,5 +139,25 @@ def test_pipeline_adds_kinetics_csv_figures_summary_and_statistics(tmp_path):
     )
     assert (tmp_path / "kinetics_metrics.csv").is_file()
     assert (tmp_path / "kinetics_profiles.svg").is_file()
+    assert (tmp_path / "grf_profiles.svg").is_file()
+    assert (tmp_path / "kinetics_profiles_per_subject.svg").is_file()
+    assert (tmp_path / "grf_profiles_per_subject.svg").is_file()
     assert (tmp_path / "kinetics_metrics.svg").is_file()
     assert "Joint moment error [Nm/kg]" in set(analysis.wilcoxon.comparisons["metric"])
+    assert any(
+        condition.endswith("subj.")
+        for condition in analysis.wilcoxon.comparisons[["condition_a", "condition_b"]].to_numpy().ravel()
+    )
+
+
+def test_population_only_gait120_writes_population_plots(tmp_path):
+    from .conftest import make_config
+
+    analysis = _analysis(tmp_path)
+    analysis.config = make_config(dataset_name="Gait120", subject_based=False)
+    analysis.human.subjects = []
+    pipeline.run_gait_position_analyses(analysis)
+    assert analysis.plots_dir == tmp_path
+    assert all(run.population is not None and run.per_subject is None for run in analysis.policies)
+    assert (tmp_path / "metrics_summary_table.png").exists()
+    assert (tmp_path / "rsms" / "human_to_human_muscle_rsa_matrix_population.svg").exists()

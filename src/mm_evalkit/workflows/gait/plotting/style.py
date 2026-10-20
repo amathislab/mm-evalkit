@@ -8,28 +8,20 @@ from matplotlib.offsetbox import AnchoredOffsetbox, DrawingArea, HPacker, TextAr
 from matplotlib.patches import Rectangle
 from matplotlib.transforms import blended_transform_factory
 
+from mm_evalkit.plotting import policy_face_color, policy_fill_alpha
+
 from ..constants import (
     REF_GREY,
 )
 
-
-def policy_fill_alpha(linestyle):
-    """Fill alpha that distinguishes same-colored policies (finetuned vs from-scratch).
-
-    Policies can share a plot color and differ only by linestyle (":" vs "-"); the bar
-    plots encode that as a fill alpha, and the metrics table and RSA markers reuse the
-    same mapping so a color is disambiguated consistently everywhere.
-    """
-    return 0.2 if linestyle == ":" else 0.8
+# Re-exported so the gait figures keep reaching their style vocabulary through this
+# module; the mapping itself is shared with the other workflows.
+__all__ = ["policy_fill_alpha"]
 
 
 def policy_color_rgba(analysis, policy_idx):
     """The policy's plot color at the same fill alpha the bar plots use for it."""
-    policy = analysis.policies[policy_idx].policy
-    return to_rgba(
-        policy.color,
-        policy_fill_alpha(policy.linestyle),
-    )
+    return policy_face_color(analysis.policies[policy_idx].policy)
 
 
 def policy_marker_box(analysis, policy_idx, text="Policy"):

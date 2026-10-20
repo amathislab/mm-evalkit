@@ -19,8 +19,12 @@ def generate_all_plots(analysis: GaitAnalysis):
     rsa.plot_rsa_results(analysis)
     rsa.plot_subject_based_rsa_results(analysis)
     kinetics.plot_kinetics_profiles(analysis)
+    kinetics.plot_grf_profiles(analysis)
+    kinetics.plot_subject_based_kinetics_profiles(analysis)
+    kinetics.plot_subject_based_grf_profiles(analysis)
     kinetics.plot_kinetics_metrics(analysis)
     summary.plot_metrics_table(analysis)
+    summary.plot_metrics_bars(analysis)
 
 
 def _compute_and_report(analysis: GaitAnalysis):
