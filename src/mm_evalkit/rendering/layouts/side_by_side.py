@@ -28,11 +28,10 @@ def compose_side_by_side(
 ) -> np.ndarray:
     """Compose the canonical full-HD frame from reusable panel outputs."""
     policy_view = cv2.resize(motion_view, (900, 675), interpolation=cv2.INTER_AREA)
-    left = np.empty((1080, 960, 3), dtype=np.uint8)
-    left[:] = (10, 16, 32)
+    left = np.full((1080, 960, 3), 255, dtype=np.uint8)
     left[140:815, 30:930] = policy_view
-    _text(left, "Policy motion (MuJoCo)", (36, 55), 1.05, (255, 255, 255), 2)
-    _text(left, clip.subtitle, (38, 100), 0.55, (172, 186, 213), 1)
+    _text(left, "Policy motion (MuJoCo)", (36, 55), 1.05, (25, 25, 25), 2)
+    _text(left, clip.subtitle, (38, 100), 0.55, (85, 85, 85), 1)
 
     sample = min(round(sample_position), len(clip.x) - 1)
     coordinate = clip.x[sample]
@@ -40,7 +39,7 @@ def compose_side_by_side(
         progress = f"gait phase {coordinate:.1f}%"
     else:
         progress = f"clip {coordinate:05.2f} / {clip.x[-1]:05.2f} s"
-    _text(left, progress, (38, 872), 0.68, (255, 255, 255), 1)
+    _text(left, progress, (38, 872), 0.68, (25, 25, 25), 1)
 
     y = 916
     spacing = min(42, max(30, 132 // len(clip.comparisons)))
@@ -57,5 +56,5 @@ def compose_side_by_side(
 def _hex_rgb(color: str) -> tuple[float, float, float]:
     value = color.lstrip("#")
     if len(value) != 6:
-        return (1.0, 1.0, 1.0)
+        return (0.0, 0.0, 0.0)
     return tuple(int(value[index : index + 2], 16) / 255.0 for index in (0, 2, 4))

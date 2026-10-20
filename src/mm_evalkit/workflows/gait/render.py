@@ -7,8 +7,7 @@ from pathlib import Path
 import numpy as np
 
 from mm_evalkit.activation import (
-    activation_sample_phase,
-    align_activation_to_observation_timeline,
+    load_emg_signal,
     complete_activation_gait_indexes,
 )
 from mm_evalkit.datasets.gait120 import Gait120_muscle_map, load_gait120_emg_step
@@ -31,6 +30,7 @@ def prepare_clip(
     episode: int,
     motion_group: str = "GAIT120_TESTING",
     gait_index: int = 0,
+    emg_signal: str = "ctrl",
     dataset_dir: str | Path | None = None,
     channels: tuple[str, ...] | list[str] = DEFAULT_CHANNELS,
     camera_azimuth: float = 105.0,
@@ -56,14 +56,10 @@ def prepare_clip(
     with np.load(source, allow_pickle=True) as archive:
         prefix = f"episode_{episode}"
         qpos = np.asarray(archive[f"{prefix}_joint_positions"], dtype=float)
-        exported = np.asarray(archive[f"{prefix}_muscle_activations"], dtype=float)
         touch = np.asarray(archive[f"{prefix}_touch_observations"], dtype=float)
         traj_id = int(np.asarray(archive[f"{prefix}_traj_id"]).item())
         reference_length = int(np.asarray(archive[f"{prefix}_traj_length"]).item())
-        activation = align_activation_to_observation_timeline(
-            exported,
-            activation_sample_phase(archive),
-        )
+        activation = load_emg_signal(archive, episode, emg_signal)
     if len(qpos) != len(activation) or len(qpos) != len(touch):
         raise ValueError("Gait120 qpos, activation, and touch observations must share one frame axis.")
 
@@ -103,7 +99,7 @@ def prepare_clip(
             policy=activation_clip[:, columns[index]],
             color=COLORS[index % len(COLORS)],
             human_label="Gait120 human EMG",
-            policy_label="Policy activation",
+            policy_label="Policy excitation (ctrl)" if emg_signal == "ctrl" else "Policy activation",
         )
         for index, name in enumerate(selected_channels)
     )
@@ -142,5 +138,6 @@ def prepare_clip(
             "subject": f"S{subject:03d}",
             "step": f"Step{gait_index + 1:02d}",
             "motion_group": motion_group,
+            "emg_signal": emg_signal,
         },
     )

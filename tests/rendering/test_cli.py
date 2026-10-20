@@ -46,3 +46,11 @@ def test_render_cli_accepts_historical_kebab_case_aliases(arguments, attribute, 
     args = build_parser().parse_args(arguments)
 
     assert getattr(args, attribute) == expected
+
+
+def test_ultramocap_render_defaults_to_ctrl_and_accepts_activation_override():
+    arguments = ["ultra-mocap", "--trajectory_path", "rollout.npz", "--episode", "0",
+                 "--trial_stem", "trial", "--output", "out.mp4"]
+    parser = build_parser()
+    assert parser.parse_args(arguments).emg_signal == "ctrl"
+    assert parser.parse_args([*arguments, "--emg-signal", "activations"]).emg_signal == "activations"

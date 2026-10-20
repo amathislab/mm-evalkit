@@ -44,6 +44,7 @@ def test_signal_panel_renders_one_row_per_comparison(n_comparisons):
     frame = panel.render(sample_position=0.0)
     assert frame.dtype == np.uint8
     assert frame.shape == (1080, 960, 3)
+    panel.close()
 
 
 def test_signal_panel_advances_with_the_sample_position():
@@ -53,12 +54,14 @@ def test_signal_panel_advances_with_the_sample_position():
     last = panel.render(sample_position=9.0)
 
     assert not np.array_equal(first, last)
+    panel.close()
 
 
 def test_side_by_side_produces_a_full_hd_frame_from_any_scene_view():
     """The layout resizes whatever the scene backend rendered; it owns no camera."""
     clip = _clip()
-    panel = SignalPanel(clip).render(sample_position=0.0)
+    signal_panel = SignalPanel(clip)
+    panel = signal_panel.render(sample_position=0.0)
     motion_view = np.full((480, 640, 3), 128, dtype=np.uint8)
 
     frame = compose_side_by_side(clip, motion_view, panel, sample_position=0.0)
@@ -67,13 +70,25 @@ def test_side_by_side_produces_a_full_hd_frame_from_any_scene_view():
     assert frame.dtype == np.uint8
     # The right half is the panel unchanged; only the left half is composed.
     assert np.array_equal(frame[:, 960:], panel)
+    assert np.array_equal(frame[1079, 0], np.array([255, 255, 255], dtype=np.uint8))
+    signal_panel.close()
+
+
+def test_signal_panel_uses_a_white_background():
+    panel = SignalPanel(_clip())
+    frame = panel.render(sample_position=0.0)
+
+    assert np.array_equal(frame[1079, 0], np.array([255, 255, 255], dtype=np.uint8))
+    panel.close()
 
 
 def test_side_by_side_clamps_a_sample_position_past_the_last_frame():
     clip = _clip()
-    panel = SignalPanel(clip).render(sample_position=0.0)
+    signal_panel = SignalPanel(clip)
+    panel = signal_panel.render(sample_position=0.0)
     motion_view = np.zeros((480, 640, 3), dtype=np.uint8)
 
     frame = compose_side_by_side(clip, motion_view, panel, sample_position=len(clip.x) + 5)
 
     assert frame.shape == (1080, 1920, 3)
+    signal_panel.close()

@@ -26,6 +26,8 @@ class MujocoScene:
         if self.model.nq != clip.qpos.shape[1] or self.model.nu != clip.activations.shape[1]:
             self.model = self._reduced_model(model_path)
         self.data = mujoco.MjData(self.model)
+        # Keep untextured model backgrounds consistent with the light layout.
+        self.model.vis.rgba.haze[:] = 1.0
         if self.model.nq != clip.qpos.shape[1]:
             raise ValueError(
                 f"Model {clip.model_name!r} has nq={self.model.nq}, but rollout qpos has {clip.qpos.shape[1]} columns."

@@ -5,7 +5,7 @@ from __future__ import annotations
 import argparse
 from collections.abc import Sequence
 
-from mm_evalkit.cli_options import add_dataset_dir, add_motion_group, add_video_output
+from mm_evalkit.cli_options import add_dataset_dir, add_emg_signal, add_motion_group, add_video_output
 from mm_evalkit.datasets.motion_sets import GAIT120_MOTION_SETS
 
 from .api import render_video
@@ -30,6 +30,7 @@ def build_parser() -> argparse.ArgumentParser:
     ultra.add_argument("--episode", required=True, type=int)
     ultra.add_argument("--trial_stem", "--trial-stem", dest="trial_stem", required=True)
     add_dataset_dir(ultra, dataset="ultra-mocap", aliases=("emg_root",))
+    add_emg_signal(ultra)
     ultra.add_argument("--cycles", type=int, default=4)
     ultra.add_argument("--cycle_offset", "--cycle-offset", dest="cycle_offset", type=int, default=0)
     _add_camera(ultra, azimuth=90.0, elevation=-8.0, distance=0.88)
@@ -40,6 +41,7 @@ def build_parser() -> argparse.ArgumentParser:
     gait.add_argument("--episode", required=True, type=int)
     add_motion_group(gait, choices=GAIT120_MOTION_SETS, required=False, aliases=("motion_set",))
     gait.set_defaults(motion_group="GAIT120_TESTING")
+    add_emg_signal(gait)
     gait.add_argument("--gait_index", "--gait-index", dest="gait_index", type=int, choices=(0, 1), default=0)
     add_dataset_dir(gait, dataset="gait120")
     gait.add_argument("--channels", nargs="+", default=None)
