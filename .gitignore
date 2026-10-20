@@ -6,3 +6,12 @@
 **/__pycache__/
 *.py[cod]
 *.egg-info/
+trajectory_data/*
+results/*
+configs/*
+assets/demos/*
+explorations/*
+
+# HealthyPiG exploration notebooks, data, and outputs (any directory).
+*[Hh][Ee][Aa][Ll][Tt][Hh][Yy][_-][Pp][Ii][Gg]*
+*[Hh][Ee][Aa][Ll][Tt][Hh][Yy][Pp][Ii][Gg]*
