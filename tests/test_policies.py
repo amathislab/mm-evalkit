@@ -180,3 +180,10 @@ def test_bimanual_rejects_gait120_kinetics_fields(tmp_path: Path):
 
     with pytest.raises(ValueError, match="kinetics fields"):
         load_bimanual_policies(config, None)
+
+
+@pytest.mark.parametrize("signal", ["activations", "ctrl"])
+def test_policy_config_rejects_analysis_wide_emg_signal(tmp_path, signal):
+    config = _write_config(tmp_path, [_policy(tmp_path / "rollout.npz", emg_signal=signal)])
+    with pytest.raises(ValueError, match="unknown field.*emg_signal"):
+        load_policy_specs(config)

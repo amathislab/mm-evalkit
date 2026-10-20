@@ -99,3 +99,11 @@ def add_video_output(parser: argparse.ArgumentParser) -> None:
     """Declare the output options every render adapter shares."""
     parser.add_argument(*_names("output"), required=True, help="Path of the rendered video file.")
     parser.add_argument(*_names("fps"), type=int, default=30, help="Frames per second (default: 30).")
+
+
+def add_emg_signal(parser: argparse.ArgumentParser) -> None:
+    """Select one simulated EMG comparator for every policy in a run."""
+    parser.add_argument(
+        *_names("emg_signal"), choices=("ctrl", "activations"), default="ctrl",
+        help="Simulated signal compared with human EMG for all policies: ctrl (default) or activations.",
+    )

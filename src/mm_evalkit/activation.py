@@ -71,3 +71,28 @@ def complete_activation_gait_indexes(
         if len(segment) >= 2 and np.isfinite(segment).all():
             retained.append((start, end))
     return retained
+
+
+def load_emg_signal(archive: Any, episode: int, signal: str = "ctrl", *, phase: str | None = None) -> np.ndarray:
+    """Load the simulated EMG comparator on the observation/action timeline.
+
+    Commands read after stepping are the input used for that step and stay on
+    row t. Commands are clipped to [0, 1] before downstream processing.
+    Legacy activation is the resulting state and moves to row t + 1.
+    """
+    if signal not in {"activations", "ctrl"}:
+        raise ValueError("emg_signal must be 'activations' or 'ctrl'.")
+    prefix = f"episode_{episode}"
+    field = "muscle_commands" if signal == "ctrl" else "muscle_activations"
+    key = f"{prefix}_{field}"
+    if key not in archive:
+        raise ValueError(f"Selected emg_signal={signal!r} requires rollout field {key!r}.")
+    values = np.asarray(archive[key], dtype=float)
+    expected = np.asarray(archive[f"{prefix}_muscle_activations"]).shape
+    if values.ndim != 2 or values.shape != expected or not np.isfinite(values).all():
+        raise ValueError(f"Rollout field {key!r} must be finite with shape {expected}; got {values.shape}.")
+    if signal == "ctrl":
+        return np.clip(values, 0.0, 1.0)
+    return align_activation_to_observation_timeline(
+        values, activation_sample_phase(archive) if phase is None else phase,
+    )
