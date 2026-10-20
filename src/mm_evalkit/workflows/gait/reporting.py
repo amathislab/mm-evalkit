@@ -6,9 +6,17 @@ from .numerics import finite_mean
 from .state import GaitAnalysis
 
 
+def _print_muscle_peak_errors(metrics):
+    height = finite_mean(metrics.muscle_peak_height_error.get("all_muscles", []))
+    time = finite_mean(metrics.muscle_peak_time_error.get("all_muscles", []))
+    print(f"    Muscle Peak Height Absolute Error: {height:.4f}")
+    print(f"    Muscle Peak Time Circular Error: {time:.4f} percentage points")
+
+
 def _print_human_to_human(analysis: GaitAnalysis) -> None:
     print("\n ### --------------------Human-to-Human Metrics-------------------- ### ")
     metrics = analysis.human_metrics
+    _print_muscle_peak_errors(metrics)
     print(f"  Average Pairwise Human-to-Human Joint RMSE: {metrics.avg_pairwise_joint_rmse['all_joints']:.4f}")
     print(f"  Average Pairwise Human-to-Human Joint Correlation: {metrics.avg_pairwise_joint_corr['all_joints']:.4f}")
     print(
@@ -25,6 +33,7 @@ def _print_reference_benchmarks(analysis: GaitAnalysis) -> None:
     print("  (1) Between-subject (pairwise) [above] -- between-subject variability, not a subject-matched bound.")
     within = analysis.references.within_subject
     if within and within.n > 0:
+        _print_muscle_peak_errors(within)
         print(f"  (2) Within-subject reliability -- Trial 5 vs mean(Trials 1-4), n={within.n} subjects:")
         print(f"        Joint RMSE:        {finite_mean(within.joint_rmse['all_joints']):.4f}")
         print(f"        Joint Correlation: {finite_mean(within.joint_corr['all_joints']):.4f}")
@@ -35,6 +44,17 @@ def _print_reference_benchmarks(analysis: GaitAnalysis) -> None:
         )
     else:
         print("  (2) Within-subject reliability -- unavailable (no earlier-trial data at this gait).")
+
+    kinetics_within = analysis.references.kinetics_within_subject
+    if kinetics_within is not None:
+        print(
+            "  (2a) Within-subject kinetic reliability -- Trial 5 vs mean(Trials 1-4), "
+            f"n={len(kinetics_within.subjects)} subject(s) {kinetics_within.subjects}:"
+        )
+        print(f"        Joint Moment RMSE: {kinetics_within.avg_torque_rmse['all_moments']:.4f} Nm/kg")
+        print(f"        Vertical GRF RMSE: {kinetics_within.avg_grf_rmse['all_grf']:.4f} BW")
+    elif analysis.kinetics is not None:
+        print("  (2a) Within-subject kinetic reliability -- unavailable (no Trials 1-4 kinetic references).")
 
     policy_references = analysis.references.policy_within_subject
     if policy_references:
@@ -65,6 +85,7 @@ def _print_reference_benchmarks(analysis: GaitAnalysis) -> None:
 def _print_population(run) -> None:
     print("\n ### --------------------Population Metrics-------------------- ### ")
     population = run.population
+    _print_muscle_peak_errors(population)
     print(f"    Average Pairwise Human-to-Model Joint RMSE: {population.avg_joint_rmse['all_joints']:.4f}")
     print(f"    Average Pairwise Human-to-Model Joint Correlation: {population.avg_joint_corr['all_joints']:.4f}")
     print(f"    Average Pairwise Human-to-Model Muscle Correlation: {population.avg_muscle_corr['all_muscles']:.4f}")
@@ -77,6 +98,7 @@ def _print_population(run) -> None:
 def _print_per_subject(run, n_cohort_subjects: int) -> None:
     print("\n ### --------------------Subject-based Metrics-------------------- ### ")
     per_subject = run.per_subject
+    _print_muscle_peak_errors(per_subject)
     if per_subject.joint_rmse["all_joints"]:
         print(
             "    Average Pairwise Human-to-Model Joint RMSE: ",

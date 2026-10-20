@@ -207,6 +207,13 @@ class KineticsCohort:
     subjects: list[int] = field(default_factory=list)
     torque_data: FloatArray = field(default_factory=lambda: np.empty((0, 0, 100)))
     grf_data: FloatArray = field(default_factory=lambda: np.empty((0, 0, 100)))
+    # The same subjects' Trials 1-4 kinetic references, when the reference directory
+    # ships them. ``earlier_*_data`` hold the per-subject mean of those trials for the
+    # active gait selection and back the within-subject kinetic reliability bound; a
+    # subject with no earlier reference is simply absent from both dicts.
+    earlier_cycles: KineticsCycles | None = None
+    earlier_torque_data: dict[int, FloatArray] = field(default_factory=dict)
+    earlier_grf_data: dict[int, FloatArray] = field(default_factory=dict)
 
     @property
     def n_subjects(self) -> int:
@@ -243,6 +250,9 @@ class PopulationMetrics:
     avg_rsa: float = float("nan")
     avg_rsa_pearson: float = float("nan")
 
+    muscle_peak_height_error: PerChannel = field(default_factory=dict)
+    muscle_peak_time_error: PerChannel = field(default_factory=dict)
+
 
 @dataclass(slots=True)
 class PerSubjectMetrics:
@@ -266,6 +276,9 @@ class PerSubjectMetrics:
     avg_rsa: float = float("nan")
     avg_rsa_pearson: float = float("nan")
 
+    muscle_peak_height_error: PerChannel = field(default_factory=dict)
+    muscle_peak_time_error: PerChannel = field(default_factory=dict)
+
 
 @dataclass(slots=True)
 class SubjectReference:
@@ -284,6 +297,9 @@ class SubjectReference:
     rsa_pearson: list[float]
     joint_corr: PerChannel | None = None
     label: str = ""
+
+    muscle_peak_height_error: PerChannel = field(default_factory=dict)
+    muscle_peak_time_error: PerChannel = field(default_factory=dict)
 
 
 @dataclass(slots=True)
@@ -306,6 +322,11 @@ class HumanReferences:
     within_subject: SubjectReference | None = None
     rsa_noise_ceiling: NoiseCeiling | None = None
     policy_within_subject: list[SubjectReference] | None = None
+    # The kinetic half of within-subject reliability (human Trial 5 vs mean of that
+    # subject's Trials 1-4 moments/GRF). Kept apart from ``within_subject`` because it
+    # is computed over the kinetics cohort, whose subjects are a subset of the
+    # kinematic/EMG cohort.
+    kinetics_within_subject: KineticsMetrics | None = None
 
 
 @dataclass(slots=True)
@@ -322,6 +343,9 @@ class HumanToHumanMetrics:
     avg_pairwise_muscle_corr: dict[str, float] = field(default_factory=dict)
     avg_pairwise_muscle_rsa: float = float("nan")
     avg_pairwise_muscle_rsa_pearson: float = float("nan")
+
+    muscle_peak_height_error: PerChannel = field(default_factory=dict)
+    muscle_peak_time_error: PerChannel = field(default_factory=dict)
 
 
 @dataclass(slots=True)
@@ -441,5 +465,6 @@ class GaitAnalysis:
             "gait_position": self.gait_position,
             "subjects": list(self.human.subjects),
             "policies": [run.policy.id for run in self.policies],
+            "emg_signal": self.config.emg_signal,
             "kinetics": self.kinetics is not None,
         }

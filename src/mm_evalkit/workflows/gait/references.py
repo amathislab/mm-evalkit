@@ -5,7 +5,7 @@ from __future__ import annotations
 from mm_evalkit.stats.rsa import rsa
 
 from .human_data import human_step_profile
-from .metrics import _empty_per_channel, compute_rsm
+from .metrics import _empty_per_channel, append_muscle_peak_errors, compute_rsm
 from .numerics import finite_mean, paired_pearson, paired_rmse
 from .state import GaitAnalysis, NoiseCeiling, SubjectReference
 
@@ -87,6 +87,14 @@ def compute_human_reference_benchmarks(analysis: GaitAnalysis) -> None:
         rsa_spearman=w_rsa_sp,
         rsa_pearson=w_rsa_pe,
     )
+
+    reference = analysis.references.within_subject
+    for subj in w_subjects:
+        append_muscle_peak_errors(
+            reference, channels.muscle_names,
+            human_step_profile(human.muscle_by_step, subj, analysis.gait_position),
+            human_step_profile(human.earlier_muscle_by_step, subj, analysis.gait_position),
+        )
 
     # --- RSA noise ceiling (leave-one-subject-out) ---
     nc_sp, nc_pe = [], []

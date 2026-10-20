@@ -21,6 +21,41 @@ def _empty_per_channel(names, aggregate):
     return {**{name: [] for name in names}, aggregate: []}
 
 
+def muscle_peak(values):
+    """Global peak height and phase (%) on an endpoint-inclusive gait cycle.
+
+    Tied maxima use the first sample. Missing/flat signals have no defined
+    peak timing; missing samples invalidate a peak rather than hiding it.
+    """
+    values = np.asarray(values, dtype=float)
+    if values.ndim != 1 or values.size < 2 or not np.isfinite(values).all():
+        return np.nan, np.nan
+    height = float(np.max(values))
+    phase = np.nan if np.ptp(values) == 0 else 100.0 * np.argmax(values) / (values.size - 1)
+    return height, float(phase)
+
+
+def muscle_peak_errors(first, second):
+    """Absolute height error and shortest circular phase error (0–50 pp)."""
+    height_a, phase_a = muscle_peak(first)
+    height_b, phase_b = muscle_peak(second)
+    delta = abs(phase_a - phase_b) % 100.0
+    return abs(height_a - height_b), min(delta, 100.0 - delta)
+
+
+def append_muscle_peak_errors(metrics, names, first, second):
+    """Append per-channel and all-muscle errors for one profile pair."""
+    heights, times = [], []
+    for idx, name in enumerate(names):
+        height, time = muscle_peak_errors(first[idx], second[idx])
+        metrics.muscle_peak_height_error.setdefault(name, []).append(height)
+        metrics.muscle_peak_time_error.setdefault(name, []).append(time)
+        heights.append(height)
+        times.append(time)
+    metrics.muscle_peak_height_error.setdefault("all_muscles", []).append(finite_mean(heights))
+    metrics.muscle_peak_time_error.setdefault("all_muscles", []).append(finite_mean(times))
+
+
 def compute_human_to_model_metrics_population(analysis: GaitAnalysis) -> None:
     """Score each policy population profile against every human subject."""
     channels = analysis.channels
@@ -69,6 +104,10 @@ def compute_human_to_model_metrics_population(analysis: GaitAnalysis) -> None:
             finite_mean([metrics.joint_corr[joint][subject] for joint in channels.joint_names])
             for subject in range(n_human_subjects)
         ]
+
+        for subject in range(n_human_subjects):
+            append_muscle_peak_errors(metrics, channels.muscle_names,
+                                     policy_avg_muscle_gaits, human.muscle_data[subject])
 
         for muscle_idx, muscle_name in enumerate(channels.muscle_names):
             metrics.muscle_corr[muscle_name] = [
@@ -145,6 +184,9 @@ def compute_human_to_model_metrics_per_subject(analysis: GaitAnalysis) -> None:
                     paired_pearson(policy_muscle_gaits[muscle_idx], human_muscle_gaits[muscle_idx])
                 )
 
+            append_muscle_peak_errors(metrics, channels.muscle_names,
+                                     policy_muscle_gaits, human_muscle_gaits)
+
             # Per-subject RSA: one RSM per subject (computed before any group averaging)
             # on both sides, then correlated over the lower off-diagonal triangle.
             rsa_spearman, rsa_pearson = rsa(run.profiles.per_subject_muscle_rsm[subj_idx], human_rsm)
@@ -218,6 +260,8 @@ def compute_human_to_human_metrics(analysis: GaitAnalysis) -> None:
                     paired_pearson(human_muscle_gaits_1[muscle_idx], human_muscle_gaits_2[muscle_idx])
                 )
 
+            append_muscle_peak_errors(metrics, channels.muscle_names,
+                                     human_muscle_gaits_1, human_muscle_gaits_2)
             rsa_spearman, rsa_pearson = rsa(rsm_1, rsm_2)
             metrics.rsa_matrix[subj_idx_2, subj_idx_1] = rsa_spearman
             metrics.rsa_matrix_pearson[subj_idx_2, subj_idx_1] = rsa_pearson
