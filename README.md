@@ -72,6 +72,24 @@ policies:
     linestyle: "-"
 ```
 
+EMG comparisons use recorded `muscle_commands` (`data.ctrl`) by default.
+Select `--emg_signal activations` (also `--emg-signal activations`) to use
+`muscle_activations` (`data.act`) instead. This analysis-wide argument applies
+to every policy, including gait trials 1–4 companions, in gait and ULTRA-MoCap
+workflows. The Python API accepts `emg_signal="ctrl"` or `"activations"`.
+
+Commands are clipped to [0, 1] before gait segmentation, averaging, or analysis.
+Commands stay on the action timeline; legacy post-step activations are shifted
+onto the observation timeline. Selecting `ctrl` requires finite commands with
+the same shape as activations. Compare signals in separate runs using distinct
+output directories; policy YAML entries do not contain `emg_signal`.
+
+For Gait120 and Wang, muscle figures show loaded signal amplitudes and a final
+column with each population trace min-max normalized. Subject-based figures
+retain raw subject profiles and show normalized population profiles in the final
+column. Display normalization does not change analysis metrics or undo source
+EMG preprocessing.
+
 The rollout `motion_group` and `traj_id` values determine subject and trial
 identity. Compared policies must use the same ordered references.
 
@@ -91,6 +109,26 @@ mm-evalkit evaluate gait120 \
 policy joint-force and foot-contact-force signals. Human joint moments come
 from inverse dynamics; human GRF comes from corrected Gait120 force-plate
 measurements.
+
+For gait rollouts unrelated to Gait120 subjects, compare pooled cycles against
+all loadable Gait120 subjects without decoding rollout subject identities:
+
+```bash
+mm-evalkit evaluate gait120 \
+  --population-only \
+  --dataset_dir /absolute/path/to/Gait120 \
+  --policy_config_file policies.yaml \
+  --plots_dir results/custom-gait-population
+```
+
+Set `trajectory_data_path` in that config to your archive. It must use the
+standard MyoFullBody rollout NPZ schema; arbitrary motion arrays need conversion.
+This mode pools every retained cycle and writes population kinematics, muscle,
+and RSA comparisons directly under `results/custom-gait-population/Gait120/`.
+It uses the human Trial-5 profiles averaged over available steps. Missing human
+subjects are dropped and reported by default. Do not pass `--motion_group`,
+trials-1-4 companion rollouts, kinetics references, or `mfb-retargeted` in this mode.
+Multiple policies must still share the same ordered rollout references.
 
 ### Wang
 
@@ -129,7 +167,10 @@ Evaluation outputs include:
 - retained-subject and exclusion audits; and
 - run manifests where the workflow provides them.
 
-Gait120 kinetics writes `kinetics_profiles.svg`, `kinetics_metrics.svg`,
+Gait120 kinetics writes population and selected-subject moment/GRF profiles
+(`kinetics_profiles.svg`, `grf_profiles.svg`, `kinetics_profiles_per_subject.svg`,
+`grf_profiles_per_subject.svg`), `kinetics_metrics.svg`, and the all-metric
+`metrics_summary_bars.svg`/`.png` figure,
 `kinetics_metrics.csv`, and `kinetics_input_omissions.csv`.
 
 Each dataset command documents its complete configuration through `--help`.
