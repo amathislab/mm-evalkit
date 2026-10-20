@@ -32,6 +32,7 @@ class FullBodyAnalysis:
         kinetics_reference_dir: str | Path | None = None,
         *,
         motion_list_Gait120: str | None = None,
+        emg_signal: str = "ctrl",
     ) -> None:
         """Validate every configured input, then load rollout and human data.
 
@@ -52,6 +53,7 @@ class FullBodyAnalysis:
             kinematics_source=kinematics_source,
             human_subject_policy=human_subject_policy,
             kinetics_reference_dir=kinetics_reference_dir,
+            emg_signal=emg_signal,
         )
         self.state: GaitAnalysis = load_gait_analysis(self.config)
 

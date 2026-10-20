@@ -8,8 +8,8 @@ import numpy as np
 
 from mm_evalkit.activation import (
     activation_sample_phase,
-    align_activation_to_observation_timeline,
     complete_activation_gait_indexes,
+    load_emg_signal,
 )
 from mm_evalkit.policies import PolicySpec
 from mm_evalkit.workflows.gait.channels import joint_names_myo, muscle_names_myo
@@ -75,6 +75,7 @@ def extract_episode_gaits(
     expected_n=None,
     *,
     activation_phase=None,
+    emg_signal="ctrl",
 ):
     """Extracting gait cycles from a single episode trajectory.
 
@@ -87,10 +88,7 @@ def extract_episode_gaits(
     joint_data_myo = policy_traj[f"episode_{episode}_joint_positions"] * 180 / math.pi
     joint_data_myo_ref = policy_traj[f"episode_{episode}_traj_qpos"] * 180 / math.pi
     phase = activation_sample_phase(policy_traj) if activation_phase is None else activation_phase
-    muscle_data_myo = align_activation_to_observation_timeline(
-        policy_traj[f"episode_{episode}_muscle_activations"],
-        phase,
-    )
+    muscle_data_myo = load_emg_signal(policy_traj, episode, emg_signal, phase=phase)
 
     feet_contacts = get_feet_contacts(touch_sensors_data=touch, threshold=0.05)
 
@@ -144,6 +142,7 @@ def extract_trajectory_data(
     *,
     subject_based: bool,
     motion_list=None,
+    emg_signal="ctrl",
 ) -> ExtractedRollout:
     """Extract and process trajectory data from a given .npz file path.
 
@@ -235,6 +234,7 @@ def extract_trajectory_data(
             episode,
             expected_n=max(1, round(reference_length / 100)),
             activation_phase=activation_phase,
+            emg_signal=emg_signal,
         )
 
         if len(episode_gait_lengths) > 0:
@@ -411,6 +411,7 @@ def load_policy_run(
     *,
     subject_based: bool,
     motion_list=None,
+    emg_signal="ctrl",
 ) -> PolicyRun:
     """Load one validated rollout and its optional earlier-trial companion."""
     if not isinstance(policy, PolicySpec):
@@ -422,6 +423,7 @@ def load_policy_run(
     extracted = extract_trajectory_data(
         channels,
         policy.trajectory_path,
+        emg_signal=emg_signal,
         subject_based=subject_based,
         motion_list=motion_list,
     )
@@ -451,6 +453,7 @@ def load_policy_run(
         earlier_trials = extract_trajectory_data(
             channels,
             policy.earlier_trials_path,
+            emg_signal=emg_signal,
             subject_based=subject_based,
             motion_list=trials_1_4_motion_list,
         ).cycles

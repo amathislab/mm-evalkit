@@ -7,6 +7,7 @@ from collections.abc import Sequence
 
 from ...cli_options import (
     add_dataset_dir,
+    add_emg_signal,
     add_motion_group,
     add_plots_dir,
     add_policy_source,
@@ -34,17 +35,23 @@ def build_parser(*, fixed_dataset: str | None = None) -> argparse.ArgumentParser
         )
     add_dataset_dir(parser, dataset=fixed_dataset.casefold() if fixed_dataset else None)
     if fixed_dataset != "Wang":
+        comparison = parser.add_mutually_exclusive_group(required=fixed_dataset == "Gait120")
+        comparison.add_argument(
+            "--population-only", "--population_only", action="store_true",
+            help="Compare pooled rollout gaits against all loadable Gait120 subjects without subject matching.",
+        )
         # Only trial-5 sets may decode the primary Gait120 rollout; Wang has no
         # motion list because its release carries no per-trial identity.
         add_motion_group(
-            parser,
+            comparison,
             choices=PRIMARY_MOTION_SETS,
-            required=fixed_dataset == "Gait120",
+            required=False,
             aliases=("motion_list_Gait120",),
         )
     else:
-        parser.set_defaults(motion_group=None)
+        parser.set_defaults(motion_group=None, population_only=False)
     add_policy_source(parser)
+    add_emg_signal(parser)
     add_plots_dir(parser, default="mm_evalkit_outputs/neuromuscular_analysis")
     if fixed_dataset != "Wang":
         parser.add_argument(
@@ -52,12 +59,6 @@ def build_parser(*, fixed_dataset: str | None = None) -> argparse.ArgumentParser
             choices=["opensim-ik", "mfb-retargeted"],
             default="opensim-ik",
             help="Kinematic ground truth; EMG always comes from the human dataset.",
-        )
-        parser.add_argument(
-            "--human_subject_policy",
-            choices=["drop-and-report", "error"],
-            default="drop-and-report",
-            help="How Gait120 handles requested subjects that human preprocessing cannot load.",
         )
         parser.add_argument(
             "--kinetics_reference_dir",
@@ -69,10 +70,18 @@ def build_parser(*, fixed_dataset: str | None = None) -> argparse.ArgumentParser
         )
     else:
         parser.set_defaults(
-            human_subject_policy="drop-and-report",
             kinematics_source="opensim-ik",
             kinetics_reference_dir=None,
         )
+    parser.add_argument(
+        "--human_subject_policy",
+        choices=["drop-and-report", "error"],
+        default="drop-and-report",
+        help=(
+            "How the human dataset handles cohort subjects its preprocessing cannot load: "
+            "drop the subject and report it (default), or fail the run."
+        ),
+    )
     return parser
 
 
@@ -84,12 +93,13 @@ def _run(argv: Sequence[str] | None, *, dataset_name: str | None) -> int:
         dataset_name=selected_dataset,
         dataset_dir=args.dataset_dir,
         policy_config_file=args.policy_config_file,
-        subject_based=selected_dataset == "Gait120",
+        subject_based=selected_dataset == "Gait120" and not args.population_only,
         plots_dir=args.plots_dir,
         motion_group=args.motion_group,
         kinematics_source=args.kinematics_source,
         human_subject_policy=args.human_subject_policy,
         kinetics_reference_dir=args.kinetics_reference_dir,
+        emg_signal=args.emg_signal,
     )
     analysis.run_gait_position_analyses()
     return 0

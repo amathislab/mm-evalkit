@@ -189,10 +189,10 @@ def test_gait120_strict_loading_rejects_a_missing_requested_subject(
 def test_wang_loader_returns_selected_population_contract(monkeypatch):
     """Wang channel selection is independent of Gait120 step semantics."""
 
-    def fake_profiles(_dataset_dir):
+    def fake_profiles(_dataset_dir, *, missing_subject_policy="drop-and-report"):
         joints = np.arange(12, dtype=float).reshape(2, 3, 2)
         muscles = np.arange(16, dtype=float).reshape(2, 4, 2)
-        return joints, muscles, ("a", "b", "c"), ("x", "y", "z", "w")
+        return joints, muscles, ("a", "b", "c"), ("x", "y", "z", "w"), (4, 6)
 
     monkeypatch.setattr(wang_loader, "load_wang_profiles", fake_profiles)
     loaded = wang_loader.load_wang(
@@ -204,6 +204,7 @@ def test_wang_loader_returns_selected_population_contract(monkeypatch):
 
     assert loaded.joint_names == ("c", "a")
     assert loaded.muscle_names == ("m2", "m1")
+    assert loaded.subjects == (4, 6)
     assert loaded.joint_data == pytest.approx(np.arange(12, dtype=float).reshape(2, 3, 2)[:, [2, 0], :])
     assert loaded.muscle_data == pytest.approx(np.arange(16, dtype=float).reshape(2, 4, 2)[:, [2, 0], :])
 
@@ -214,6 +215,50 @@ def test_wang_loader_requires_declared_source_files(tmp_path: Path):
 
     with pytest.raises(FileNotFoundError, match=r"Subj04_walk_45\.mat"):
         wang_loader.load_wang_profiles(tmp_path)
+
+
+def _fake_wang_subject_reader(*, unreadable: set[int]):
+    """Return a _load_subject stand-in that fails for the named subjects."""
+
+    def read(path: Path):
+        subject = int(path.stem[len("Subj") : len("Subj") + 2])
+        if subject in unreadable:
+            raise ValueError(f"{path} could not be read to the end; the file is truncated or corrupt.")
+        joints = np.full((wang_loader.PHASE_POINTS, len(wang_loader.JOINT_NAMES)), float(subject))
+        muscles = np.full((wang_loader.PHASE_POINTS, len(wang_loader.MUSCLE_NAMES)), float(subject))
+        return joints, muscles
+
+    return read
+
+
+def test_wang_loader_drops_unreadable_subject_and_reports_it(monkeypatch, capsys):
+    """A truncated source recording excludes only its own subject by default."""
+    monkeypatch.setattr(wang_loader, "_load_subject", _fake_wang_subject_reader(unreadable={5}))
+
+    joints, muscles, _, _, retained = wang_loader.load_wang_profiles("unused")
+
+    assert retained == tuple(subject for subject in wang_loader.SUBJECTS if subject != 5)
+    assert joints.shape[0] == len(wang_loader.SUBJECTS) - 1
+    assert muscles.shape[0] == len(wang_loader.SUBJECTS) - 1
+    report = capsys.readouterr().out
+    assert "Wang input omissions: 1" in report
+    assert "subject=05" in report
+
+
+def test_wang_loader_can_require_the_full_cohort(monkeypatch):
+    """The error policy refuses to shrink the reference population."""
+    monkeypatch.setattr(wang_loader, "_load_subject", _fake_wang_subject_reader(unreadable={5}))
+
+    with pytest.raises(ValueError, match=r"could not retain cohort subject\(s\): \[5\]"):
+        wang_loader.load_wang_profiles("unused", missing_subject_policy="error")
+
+
+def test_wang_loader_rejects_a_cohort_with_no_usable_recording(monkeypatch):
+    """Dropping every subject is an input error, not an empty population."""
+    monkeypatch.setattr(wang_loader, "_load_subject", _fake_wang_subject_reader(unreadable=set(wang_loader.SUBJECTS)))
+
+    with pytest.raises(ValueError, match="retained no usable subject recordings"):
+        wang_loader.load_wang_profiles("unused")
 
 
 def test_cli_requires_dataset_and_policy_config_paths(capsys):
@@ -600,3 +645,50 @@ def test_fullbody_rollout_validates_optional_embedded_kinetics():
     archive["episode_0_kinetics_reference_steps"] = np.array([0, 1, 1, 3])
     with pytest.raises(ValueError, match="strictly increasing"):
         validate_rollout_archive(archive, "rollout.npz", subject_based=False, motion_count=None)
+
+
+def test_population_only_gait120_cli_and_config(tmp_path):
+    args = build_parser(fixed_dataset="Gait120").parse_args([
+        "--population-only", "--policy_config_file", str(tmp_path / "policies.yaml"),
+    ])
+    assert args.population_only
+    assert args.motion_group is None
+    config = FullBodyConfig.from_arguments(
+        dataset_name="Gait120", dataset_dir=tmp_path,
+        policy_config_file=tmp_path / "policies.yaml", subject_based=False,
+        motion_set_name=None, plots_root=tmp_path / "plots",
+        kinematics_source="opensim-ik", human_subject_policy="drop-and-report",
+    )
+    assert not config.subject_based
+    assert config.motion_set_name is None
+    with pytest.raises(SystemExit):
+        build_parser(fixed_dataset="Gait120").parse_args([
+            "--population-only", "--motion_group", "GAIT120_TESTING",
+            "--policy_config_file", str(tmp_path / "policies.yaml"),
+        ])
+
+
+def test_population_only_gait120_loads_all_human_subjects_without_motion_mapping(tmp_path, monkeypatch):
+    from mm_evalkit.workflows.gait import loading
+    from .conftest import make_config
+
+    config = make_config(dataset_name="Gait120", subject_based=False)
+    config = replace(config, dataset_dir=tmp_path, plots_root=tmp_path, motion_set_name=None)
+    monkeypatch.setattr(FullBodyConfig, "load_policies", lambda self: [])
+    calls = {}
+
+    def validate(policies, **kwargs):
+        calls["validation"] = kwargs
+
+    def load_humans(config, channels, muscle_map, subjects, plots_dir):
+        calls["subjects"] = subjects
+        return make_cohort([1, 120])
+
+    monkeypatch.setattr(loading, "validate_policy_rollouts", validate)
+    monkeypatch.setattr(loading.human_data, "load_human_cohort", load_humans)
+    analysis = loading.load_gait_analysis(config)
+    assert analysis.motion_list is None
+    assert calls["subjects"] == list(range(1, 121))
+    assert calls["validation"]["subject_based"] is False
+    assert calls["validation"]["expected_motion_group"] is None
+    assert calls["validation"]["motion_count"] is None

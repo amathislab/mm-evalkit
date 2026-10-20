@@ -39,6 +39,11 @@ class FullBodyConfig:
     kinematics_source: KinematicsSource
     human_subject_policy: HumanSubjectPolicy = "drop-and-report"
     kinetics_reference_dir: Path | None = None
+    emg_signal: str = "ctrl"
+
+    def __post_init__(self) -> None:
+        if self.emg_signal not in {"ctrl", "activations"}:
+            raise ValueError("emg_signal must be 'ctrl' or 'activations'.")
 
     @classmethod
     def from_arguments(
@@ -53,6 +58,7 @@ class FullBodyConfig:
         kinematics_source: str,
         human_subject_policy: str,
         kinetics_reference_dir: str | Path | None = None,
+        emg_signal: str = "ctrl",
     ) -> FullBodyConfig:
         """Validate public API arguments before any rollout is opened."""
         if dataset_name not in {"Gait120", "Wang"}:
@@ -77,7 +83,7 @@ class FullBodyConfig:
             )
 
         selected_motion_set: str | None = None
-        if dataset_name == "Gait120":
+        if dataset_name == "Gait120" and resolved_subject_based:
             if motion_set_name is None:
                 raise ValueError(
                     "motion_list_Gait120 is required for Gait120 so rollout "
@@ -90,6 +96,11 @@ class FullBodyConfig:
                     f"set; got {motion_set_name!r}. Choose one of: {available}."
                 )
             selected_motion_set = motion_set_name
+
+        if dataset_name == "Gait120" and not resolved_subject_based and motion_set_name is not None:
+            raise ValueError("Population-only Gait120 does not use a motion group.")
+        if kinetics_reference_dir is not None and not resolved_subject_based:
+            raise ValueError("Kinetics is only valid for subject-based Gait120 analyses.")
 
         plots_path = Path(plots_root)
         if plots_path.exists() and not plots_path.is_dir():
@@ -112,6 +123,7 @@ class FullBodyConfig:
             kinematics_source=kinematics_source,
             human_subject_policy=human_subject_policy,
             kinetics_reference_dir=kinetics_path,
+            emg_signal=emg_signal,
         )
 
     def load_policies(self) -> list[PolicySpec]:
@@ -131,8 +143,8 @@ class FullBodyConfig:
             raise ValueError("Kinetics is only valid for subject-based Gait120 analyses.")
 
         for policy in policies:
-            if self.dataset_name == "Wang" and policy.earlier_trials_path is not None:
-                raise ValueError(f"Policy {policy.id!r} configures Gait120 trials 1-4 data for Wang.")
+            if not self.subject_based and policy.earlier_trials_path is not None:
+                raise ValueError(f"Policy {policy.id!r} configures Gait120 trials 1-4 data for a population-only analysis.")
             if policy.earlier_trials_motion_set is not None and policy.earlier_trials_motion_set not in MOTION_SETS:
                 available = ", ".join(sorted(MOTION_SETS))
                 raise ValueError(

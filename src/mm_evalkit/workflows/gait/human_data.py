@@ -53,7 +53,7 @@ def load_human_cohort(config, channels: GaitChannels, muscle_map, subjects, plot
             earlier_joint_by_step=data.earlier_joint_by_step,
             earlier_muscle_by_step=data.earlier_muscle_by_step,
             omissions=data.omissions,
-            subjects=list(data.subjects),
+            subjects=list(data.subjects) if config.subject_based else [],
             joint_data=data.joint_data,
             muscle_data=data.muscle_data,
         )
@@ -65,9 +65,14 @@ def load_human_cohort(config, channels: GaitChannels, muscle_map, subjects, plot
             selected_joint_names=list(channels.joint_names),
             selected_muscle_names=list(channels.muscle_names),
             muscle_map=muscle_map,
+            missing_subject_policy=config.human_subject_policy,
         )
+        print(f"  Wang cohort subjects retained: {list(data.subjects)}")
+        # ``subjects`` stays empty: Wang is population-only, and the per-subject
+        # stages key off it. ``all_subjects`` is read only by the subject-based
+        # gait selection, so it can carry the loaded identities for labelling.
         cohort = HumanCohort(
-            all_subjects=[],
+            all_subjects=list(data.subjects),
             joint_names=list(data.joint_names),
             muscle_names=list(data.muscle_names),
             joint_by_step=empty,

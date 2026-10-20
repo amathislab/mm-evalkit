@@ -112,6 +112,7 @@ def load_gait_analysis(config: FullBodyConfig) -> GaitAnalysis:
             policy,
             subject_based=config.subject_based,
             motion_list=motion_list,
+            emg_signal=config.emg_signal,
         )
         for policy in policy_specs
     ]
@@ -119,7 +120,8 @@ def load_gait_analysis(config: FullBodyConfig) -> GaitAnalysis:
         config,
         channels,
         muscle_map,
-        requested_subjects(motion_list),
+        list(range(1, 121)) if config.dataset_name == "Gait120" and not config.subject_based
+        else requested_subjects(motion_list),
         output_dir,
     )
     kinetics = kinetics_data.load_kinetics_cohort(
