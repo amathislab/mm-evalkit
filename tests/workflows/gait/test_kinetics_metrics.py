@@ -36,7 +36,24 @@ def _cycles(offset: float) -> KineticsCycles:
     )
 
 
-def _analysis(tmp_path: Path):
+def _earlier_cycles(subjects: list[int], offset: float) -> KineticsCycles:
+    """Trials 1-4 cycles for ``subjects``, each a constant ``offset`` from their Trial 5."""
+    positions = [SUBJECTS.index(subject) for subject in subjects]
+    trial_five = _cycles(0.0)
+    torque = np.concatenate([trial_five.torque[positions] + offset for _ in (1, 2)])
+    grf = np.concatenate([trial_five.grf[positions] + offset for _ in (1, 2)])
+    return KineticsCycles(
+        torque=torque,
+        torque_ref=torque.copy(),
+        grf=grf,
+        grf_ref=grf.copy(),
+        subject_ids=np.asarray(subjects * 2),
+        trial_ids=np.asarray([1] * len(subjects) + [2] * len(subjects)),
+        gait_positions=np.zeros(2 * len(subjects), dtype=int),
+    )
+
+
+def _analysis(tmp_path: Path, earlier: KineticsCycles | None = None):
     human_cycles = _cycles(0.0)
     cohort = KineticsCohort(
         torque_names=TORQUE_JOINTS,
@@ -45,6 +62,7 @@ def _analysis(tmp_path: Path):
         grf_unit="BW",
         cycles=human_cycles,
         reference_paths=(),
+        earlier_cycles=earlier,
     )
     runs = [make_run("first"), make_run("second")]
     runs[0].kinetics_cycles = _cycles(1.0)
@@ -97,3 +115,28 @@ def test_tidy_csv_contains_every_scope_signal_metric_and_unit(tmp_path: Path) ->
     text = path.read_text(encoding="utf-8")
     assert "human_human,joint_moment,rmse,hip_flexion_r,subject_pair,51-52" in text
     assert "first,first,subject_matched,vertical_grf,pearson,left,subject,51" in text
+
+
+def test_within_subject_reliability_scores_trial_five_against_the_same_subjects_earlier_trials(
+    tmp_path: Path,
+) -> None:
+    # Only two of the three subjects ship earlier kinetic trials, as in the release.
+    analysis = _analysis(tmp_path, earlier=_earlier_cycles([51, 52], 0.5))
+
+    compute_kinetics_metrics(analysis)
+
+    within = analysis.references.kinetics_within_subject
+    assert within.subjects == [51, 52]
+    np.testing.assert_allclose(within.torque_rmse["all_moments"], 0.5)
+    np.testing.assert_allclose(within.grf_rmse["all_grf"], 0.5)
+    assert "human_within_subject,joint_moment,rmse,hip_flexion_r,subject,51" in write_kinetics_metrics(
+        analysis
+    ).read_text(encoding="utf-8")
+
+
+def test_within_subject_reliability_is_absent_without_earlier_kinetic_trials(tmp_path: Path) -> None:
+    analysis = _analysis(tmp_path)
+
+    compute_kinetics_metrics(analysis)
+
+    assert analysis.references.kinetics_within_subject is None

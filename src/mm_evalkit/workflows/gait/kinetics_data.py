@@ -39,6 +39,9 @@ _SUMMARY_GRF_UNITS = {"body_weight_normalized", "body_weight_units", "bw"}
 _RAW_TORQUE_UNITS = {"nm", "n_m"}
 _RAW_FORCE_UNITS = {"n", "newtons"}
 _GRAVITY_MPS2 = 9.80665
+# The trials a subject's within-subject kinetic reliability is measured against; Trial 5
+# is the tested one and comes from the rollout-matched references.
+EARLIER_TRIALS = (1, 2, 3, 4)
 
 
 @dataclass(frozen=True, slots=True)
@@ -517,6 +520,30 @@ def load_policy_kinetics(
     return _load_rollout_policy_kinetics(policy, reference_dir=reference_dir, motion_list=motion_list)
 
 
+def load_human_earlier_kinetics(
+    references: dict[tuple[int, int], Gait120KineticsTrial],
+) -> KineticsCycles | None:
+    """Load the cohort subjects' Trials 1-4 kinetic references, if the release ships them.
+
+    The tested Trial 5 reference of each subject names the directory its siblings live
+    in, so the earlier trials are found the same way for both the summary and the
+    embedded-rollout route, without a second configured path. Trials that are absent are
+    skipped: the Gait120 kinetics release only covers part of the cohort, so the
+    within-subject bound is computed over whichever subjects do have earlier trials.
+    """
+    trials: dict[tuple[int, int], Gait120KineticsTrial] = {}
+    for subject, tested_trial in sorted(references):
+        directory = references[(subject, tested_trial)].path.parent
+        for trial in EARLIER_TRIALS:
+            path = directory / f"S{subject:03d}_Trial{trial:02d}_Step01_Step02.npz"
+            if not path.is_file():
+                continue
+            trials[(subject, trial)] = load_gait120_kinetics_trial(path)
+    if not trials:
+        return None
+    return _reference_cycles(trials)
+
+
 def _reference_cycles(references: dict[tuple[int, int], Gait120KineticsTrial]) -> KineticsCycles:
     torque: list[FloatArray] = []
     grf: list[FloatArray] = []
@@ -603,6 +630,12 @@ def load_kinetics_cohort(
 
     references = loaded[0].references
     paths = tuple(references[key].path for key in sorted(references))
+    earlier_cycles = load_human_earlier_kinetics(references)
+    if earlier_cycles is None:
+        print("  Kinetics: no Trials 1-4 references found; the within-subject kinetic bound is unavailable.")
+    else:
+        earlier_subjects = sorted({int(subject) for subject in np.unique(earlier_cycles.subject_ids)})
+        print(f"  Kinetics: loaded Trials 1-4 references for {len(earlier_subjects)} subject(s): {earlier_subjects}")
     return KineticsCohort(
         torque_names=TORQUE_JOINTS,
         grf_names=GRF_CHANNELS,
@@ -610,6 +643,7 @@ def load_kinetics_cohort(
         grf_unit=GRF_UNIT,
         cycles=_reference_cycles(references),
         reference_paths=paths,
+        earlier_cycles=earlier_cycles,
     )
 
 
@@ -687,6 +721,18 @@ def select_kinetics_subset(runs: list[PolicyRun], cohort: KineticsCohort, subjec
     cohort.subjects = [int(subject) for subject in human_profiles.subject_ids]
     cohort.torque_data = np.stack([human_profiles.per_subject_torque[subject] for subject in cohort.subjects])
     cohort.grf_data = np.stack([human_profiles.per_subject_grf[subject] for subject in cohort.subjects])
+
+    # Trials 1-4 of the same subjects, averaged per subject exactly like the tested
+    # trial above, so the within-subject bound compares like with like. Only subjects
+    # with an earlier cycle at this gait position appear.
+    cohort.earlier_torque_data = {}
+    cohort.earlier_grf_data = {}
+    if cohort.earlier_cycles is not None:
+        earlier_mask = _selection_mask(cohort.earlier_cycles, subjects, gait_position)
+        if earlier_mask.any():
+            earlier_profiles = build_kinetics_profiles(cohort.earlier_cycles, earlier_mask)
+            cohort.earlier_torque_data = dict(earlier_profiles.per_subject_torque)
+            cohort.earlier_grf_data = dict(earlier_profiles.per_subject_grf)
 
     for run in runs:
         if run.kinetics_cycles is None:

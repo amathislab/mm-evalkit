@@ -5,52 +5,305 @@ from __future__ import annotations
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.colors import to_rgba
+from matplotlib.gridspec import GridSpec
 
-from ..constants import REF_GREY
-from .style import policy_fill_alpha
+from ..constants import BETWEEN_SUBJECT_HATCH, BETWEEN_SUBJECT_LABEL, REF_GREY
+from .style import draw_grouped_hbar, policy_fill_alpha
+
+
+def _plot_signal_profiles(
+    analysis,
+    *,
+    signal: str,
+    names: tuple[str, ...],
+    unit: str,
+    human_data: np.ndarray,
+    human_metric: dict[str, np.ndarray],
+    policy_metrics: list[dict[str, np.ndarray]],
+    policy_profiles: list[np.ndarray],
+    aggregate_name: str,
+    metric_label: str,
+    output_name: str,
+) -> None:
+    """Draw one signal family in the shared gait metric/profile layout.
+
+    Kinematics and EMG use an aggregate bar panel, per-channel bars, and one
+    waveform per row.  Moments and GRF follow that same layout so the figures
+    can be compared directly instead of requiring a separate kinetics legend.
+    """
+    n_channels = len(names)
+    phase = np.linspace(0.0, 100.0, human_data.shape[-1])
+    fig = plt.figure(figsize=(14, 1.9 * n_channels + 1))
+    grid = GridSpec(n_channels, 3, figure=fig, width_ratios=[1, 1, 2], hspace=0.6, wspace=0.3)
+
+    aggregate_ax = fig.add_subplot(grid[:, 0])
+    draw_grouped_hbar(
+        analysis,
+        aggregate_ax,
+        human_metric[aggregate_name],
+        BETWEEN_SUBJECT_LABEL,
+        [metrics[aggregate_name] for metrics in policy_metrics],
+        show_group_labels=True,
+        ref_hatch=BETWEEN_SUBJECT_HATCH,
+    )
+    aggregate_ax.set_xlabel(metric_label)
+    aggregate_ax.set_title(f"All {signal}")
+
+    metric_ax_ref = None
+    for index, name in enumerate(names):
+        metric_ax = fig.add_subplot(grid[index, 1], sharex=metric_ax_ref)
+        metric_ax_ref = metric_ax_ref or metric_ax
+        draw_grouped_hbar(
+            analysis,
+            metric_ax,
+            human_metric[name],
+            BETWEEN_SUBJECT_LABEL,
+            [metrics[name] for metrics in policy_metrics],
+            show_group_labels=False,
+            ref_hatch=BETWEEN_SUBJECT_HATCH,
+        )
+        metric_ax.set_title(name)
+        if index == n_channels - 1:
+            metric_ax.set_xlabel(metric_label)
+
+        profile_ax = fig.add_subplot(grid[index, 2])
+        for human_profile in human_data[:, index, :]:
+            profile_ax.plot(phase, human_profile, color=REF_GREY, linewidth=2.5, alpha=0.5, zorder=1)
+        for run, profile in zip(analysis.policies, policy_profiles, strict=True):
+            profile_ax.plot(
+                phase,
+                profile[index],
+                color=run.policy.color,
+                linestyle=run.policy.linestyle,
+                linewidth=2.5,
+                alpha=0.8,
+                zorder=2,
+            )
+        profile_ax.set_ylabel(unit)
+        if index == n_channels - 1:
+            profile_ax.set_xlabel("Gait cycle [%]")
+        profile_ax.spines[["top", "right"]].set_visible(False)
+
+    fig.savefig(analysis.plots_dir / output_name, bbox_inches="tight")
+    plt.close(fig)
 
 
 def plot_kinetics_profiles(analysis) -> None:
-    """Plot the six joint moments and bilateral vertical GRF over gait phase."""
+    """Plot joint moments in the standard gait metric/profile layout."""
     cohort = analysis.kinetics
     if cohort is None:
         return
-    phase = np.linspace(0.0, 100.0, 100)
-    fig, axes = plt.subplots(2, 4, figsize=(18, 8), sharex=True)
-    channels = [
-        *(("torque", index, name, cohort.torque_unit) for index, name in enumerate(cohort.torque_names)),
-        *(("grf", index, name, cohort.grf_unit) for index, name in enumerate(cohort.grf_names)),
-    ]
-    for ax, (signal, index, name, unit) in zip(axes.ravel(), channels, strict=True):
-        human = cohort.torque_data[:, index] if signal == "torque" else cohort.grf_data[:, index]
-        human_mean = np.nanmean(human, axis=0)
-        human_std = np.nanstd(human, axis=0)
-        ax.fill_between(phase, human_mean - human_std, human_mean + human_std, color=REF_GREY, alpha=0.35)
-        ax.plot(phase, human_mean, color="black", linewidth=2, label="OpenSim human")
-        for run in analysis.policies:
-            profiles = run.kinetics_profiles
-            if profiles is None:
-                raise RuntimeError(f"Policy {run.policy.id!r} has no kinetics profiles.")
-            values = profiles.avg_torque[index] if signal == "torque" else profiles.avg_grf[index]
-            ax.plot(
+    human = analysis.kinetics_human_metrics
+    if human is None:
+        raise RuntimeError("Kinetics metrics have not been computed.")
+    profiles = []
+    for run in analysis.policies:
+        if run.kinetics_profiles is None:
+            raise RuntimeError(f"Policy {run.policy.id!r} has no kinetics profiles.")
+        profiles.append(run.kinetics_profiles.avg_torque)
+    _plot_signal_profiles(
+        analysis,
+        signal="moments",
+        names=cohort.torque_names,
+        unit=cohort.torque_unit,
+        human_data=cohort.torque_data,
+        human_metric=human.torque_rmse,
+        policy_metrics=[run.kinetics_population.torque_rmse for run in analysis.policies],
+        policy_profiles=profiles,
+        aggregate_name="all_moments",
+        metric_label="RMSE [Nm/kg]",
+        output_name="kinetics_profiles.svg",
+    )
+
+
+def plot_grf_profiles(analysis) -> None:
+    """Plot bilateral vertical GRF in the standard gait metric/profile layout."""
+    cohort = analysis.kinetics
+    if cohort is None:
+        return
+    human = analysis.kinetics_human_metrics
+    if human is None:
+        raise RuntimeError("Kinetics metrics have not been computed.")
+    profiles = []
+    for run in analysis.policies:
+        if run.kinetics_profiles is None:
+            raise RuntimeError(f"Policy {run.policy.id!r} has no kinetics profiles.")
+        profiles.append(run.kinetics_profiles.avg_grf)
+    _plot_signal_profiles(
+        analysis,
+        signal="vertical GRF",
+        names=cohort.grf_names,
+        unit=cohort.grf_unit,
+        human_data=cohort.grf_data,
+        human_metric=human.grf_rmse,
+        policy_metrics=[run.kinetics_population.grf_rmse for run in analysis.policies],
+        policy_profiles=profiles,
+        aggregate_name="all_grf",
+        metric_label="RMSE [BW]",
+        output_name="grf_profiles.svg",
+    )
+
+
+def _plot_signal_profiles_per_subject(
+    analysis,
+    *,
+    signal: str,
+    names: tuple[str, ...],
+    unit: str,
+    human_data: np.ndarray,
+    human_subjects: list[int],
+    human_metric: dict[str, np.ndarray],
+    policy_metrics: list[dict[str, np.ndarray]],
+    policy_profiles: list[dict[int, np.ndarray]],
+    aggregate_name: str,
+    metric_label: str,
+    output_name: str,
+) -> None:
+    """Draw selected subject waveforms beside subject-matched metric bars."""
+    if not analysis.subject_based:
+        return
+
+    requested_subjects = [analysis.human.subjects[index] for index in analysis.human.plot_subject_positions]
+    subject_indexes = {subject: index for index, subject in enumerate(human_subjects)}
+    subjects = [subject for subject in requested_subjects if subject in subject_indexes]
+    if not subjects:
+        return
+
+    n_channels = len(names)
+    phase = np.linspace(0.0, 100.0, human_data.shape[-1])
+    fig = plt.figure(figsize=(10 + 2.2 * len(subjects), 1.9 * n_channels + 1))
+    grid = GridSpec(
+        n_channels,
+        2 + len(subjects),
+        figure=fig,
+        width_ratios=[3, 3] + [2.2] * len(subjects),
+        hspace=0.6,
+        wspace=0.45,
+    )
+
+    aggregate_ax = fig.add_subplot(grid[:, 0])
+    draw_grouped_hbar(
+        analysis,
+        aggregate_ax,
+        human_metric[aggregate_name],
+        BETWEEN_SUBJECT_LABEL,
+        [metrics[aggregate_name] for metrics in policy_metrics],
+        show_group_labels=True,
+        ref_hatch=BETWEEN_SUBJECT_HATCH,
+    )
+    aggregate_ax.set_xlabel(metric_label)
+    aggregate_ax.set_title(f"All {signal}")
+
+    metric_ax_ref = None
+    for channel_index, name in enumerate(names):
+        metric_ax = fig.add_subplot(grid[channel_index, 1], sharex=metric_ax_ref)
+        metric_ax_ref = metric_ax_ref or metric_ax
+        draw_grouped_hbar(
+            analysis,
+            metric_ax,
+            human_metric[name],
+            BETWEEN_SUBJECT_LABEL,
+            [metrics[name] for metrics in policy_metrics],
+            show_group_labels=False,
+            ref_hatch=BETWEEN_SUBJECT_HATCH,
+        )
+        metric_ax.set_ylabel(name)
+        if channel_index == 0:
+            metric_ax.set_title("RMSE")
+        if channel_index == n_channels - 1:
+            metric_ax.set_xlabel(metric_label)
+
+        for column_index, subject in enumerate(subjects):
+            profile_ax = fig.add_subplot(grid[channel_index, 2 + column_index])
+            if channel_index == 0:
+                profile_ax.set_title(f"Subj. {subject}")
+            if column_index == 0:
+                profile_ax.set_ylabel(unit)
+            if channel_index == n_channels - 1:
+                profile_ax.set_xlabel("Gait cycle [%]")
+            profile_ax.plot(
                 phase,
-                values,
-                color=run.policy.color,
-                linestyle=run.policy.linestyle,
-                linewidth=2,
-                label=run.label,
+                human_data[subject_indexes[subject], channel_index],
+                color=REF_GREY,
+                linewidth=2.5,
+                alpha=0.5,
+                zorder=1,
             )
-        ax.set_title(name)
-        ax.set_ylabel(unit)
-        ax.set_xlabel("Gait cycle [%]")
-        ax.spines[["top", "right"]].set_visible(False)
-        ax.grid(alpha=0.2)
-    handles, labels = axes[0, 0].get_legend_handles_labels()
-    fig.legend(handles, labels, loc="upper center", ncol=max(1, len(labels)))
-    fig.suptitle("Gait120 kinetics profiles", y=1.02)
-    fig.tight_layout()
-    fig.savefig(analysis.plots_dir / "kinetics_profiles.svg", bbox_inches="tight")
+            for run, profiles in zip(analysis.policies, policy_profiles, strict=True):
+                profile = profiles.get(subject)
+                if profile is None:
+                    continue
+                profile_ax.plot(
+                    phase,
+                    profile[channel_index],
+                    color=run.policy.color,
+                    linestyle=run.policy.linestyle,
+                    linewidth=2.5,
+                    alpha=0.8,
+                    zorder=2,
+                )
+            profile_ax.spines[["top", "right"]].set_visible(False)
+
+    fig.savefig(analysis.plots_dir / output_name, bbox_inches="tight")
     plt.close(fig)
+
+
+def plot_subject_based_kinetics_profiles(analysis) -> None:
+    """Plot subject-matched joint-moment metrics and selected subject waveforms."""
+    cohort = analysis.kinetics
+    if cohort is None:
+        return
+    human = analysis.kinetics_human_metrics
+    if human is None:
+        raise RuntimeError("Kinetics metrics have not been computed.")
+    profiles = []
+    for run in analysis.policies:
+        if run.kinetics_profiles is None:
+            raise RuntimeError(f"Policy {run.policy.id!r} has no kinetics profiles.")
+        profiles.append(run.kinetics_profiles.per_subject_torque)
+    _plot_signal_profiles_per_subject(
+        analysis,
+        signal="moments",
+        names=cohort.torque_names,
+        unit=cohort.torque_unit,
+        human_data=cohort.torque_data,
+        human_subjects=cohort.subjects,
+        human_metric=human.torque_rmse,
+        policy_metrics=[run.kinetics_per_subject.torque_rmse for run in analysis.policies],
+        policy_profiles=profiles,
+        aggregate_name="all_moments",
+        metric_label="RMSE [Nm/kg]",
+        output_name="kinetics_profiles_per_subject.svg",
+    )
+
+
+def plot_subject_based_grf_profiles(analysis) -> None:
+    """Plot subject-matched GRF metrics and selected subject waveforms."""
+    cohort = analysis.kinetics
+    if cohort is None:
+        return
+    human = analysis.kinetics_human_metrics
+    if human is None:
+        raise RuntimeError("Kinetics metrics have not been computed.")
+    profiles = []
+    for run in analysis.policies:
+        if run.kinetics_profiles is None:
+            raise RuntimeError(f"Policy {run.policy.id!r} has no kinetics profiles.")
+        profiles.append(run.kinetics_profiles.per_subject_grf)
+    _plot_signal_profiles_per_subject(
+        analysis,
+        signal="vertical GRF",
+        names=cohort.grf_names,
+        unit=cohort.grf_unit,
+        human_data=cohort.grf_data,
+        human_subjects=cohort.subjects,
+        human_metric=human.grf_rmse,
+        policy_metrics=[run.kinetics_per_subject.grf_rmse for run in analysis.policies],
+        policy_profiles=profiles,
+        aggregate_name="all_grf",
+        metric_label="RMSE [BW]",
+        output_name="grf_profiles_per_subject.svg",
+    )
 
 
 def _finite(values) -> np.ndarray:

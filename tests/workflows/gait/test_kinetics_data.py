@@ -7,9 +7,10 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from mm_evalkit.datasets.gait120_kinetics import TORQUE_JOINTS
+from mm_evalkit.datasets.gait120_kinetics import TORQUE_JOINTS, load_gait120_kinetics_trial
 from mm_evalkit.policies import PolicySpec
 from mm_evalkit.workflows.gait.kinetics_data import (
+    load_human_earlier_kinetics,
     load_kinetics_cohort,
     load_policy_kinetics,
     select_kinetics_subset,
@@ -19,18 +20,18 @@ from mm_evalkit.workflows.gait.kinetics_data import (
 from .conftest import make_run
 
 
-def _write_reference(path: Path) -> None:
+def _write_reference(path: Path, *, trial: str = "Trial05") -> None:
     n_frames = 220
     time = np.arange(n_frames) * 0.01
     left = np.zeros(n_frames)
     left[:50] = 1.0
     left[100:150] = 1.0
     left[200:] = 1.0
-    path.parent.mkdir(parents=True)
+    path.parent.mkdir(parents=True, exist_ok=True)
     np.savez(
         path,
         subject="S012",
-        trial="Trial05",
+        trial=trial,
         step_label="Step01_Step02",
         time_sec=time,
         joint_torque=np.column_stack([np.arange(n_frames) + 1000 * index for index in range(6)]),
@@ -310,3 +311,24 @@ def test_mismatched_policy_reference_samples_are_rejected(tmp_path: Path) -> Non
 
     with pytest.raises(ValueError, match="do not match"):
         load_kinetics_cohort(runs, reference_dir=None)
+
+
+def test_earlier_human_kinetic_trials_are_found_beside_the_tested_reference(tmp_path: Path) -> None:
+    subject_dir = tmp_path / "references" / "S012"
+    _write_reference(subject_dir / "S012_Trial05_Step01_Step02.npz")
+    _write_reference(subject_dir / "S012_Trial01_Step01_Step02.npz", trial="Trial01")
+    _write_reference(subject_dir / "S012_Trial03_Step01_Step02.npz", trial="Trial03")
+    tested = load_gait120_kinetics_trial(subject_dir / "S012_Trial05_Step01_Step02.npz")
+
+    cycles = load_human_earlier_kinetics({(12, 5): tested})
+
+    assert sorted(set(cycles.trial_ids.tolist())) == [1, 3]
+    assert set(cycles.subject_ids.tolist()) == {12}
+    assert cycles.torque.shape[1:] == (6, 100)
+
+
+def test_earlier_human_kinetics_are_absent_when_only_the_tested_trial_ships(tmp_path: Path) -> None:
+    reference = tmp_path / "references" / "S012" / "S012_Trial05_Step01_Step02.npz"
+    _write_reference(reference)
+
+    assert load_human_earlier_kinetics({(12, 5): load_gait120_kinetics_trial(reference)}) is None

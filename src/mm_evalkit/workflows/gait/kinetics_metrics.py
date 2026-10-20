@@ -47,11 +47,53 @@ def _finalize(metrics: KineticsMetrics) -> None:
     metrics.avg_grf_corr = {channel: finite_mean(values) for channel, values in metrics.grf_corr.items()}
 
 
+def _compute_within_subject_reliability(analysis: GaitAnalysis) -> None:
+    """Score each subject's tested trial against the mean of their own Trials 1-4.
+
+    The kinetic half of the within-subject reliability bound: the same recipe the
+    kinematic and EMG references use, so the moment/GRF panels get the subject-matched
+    ceiling their neighbours already show. Subjects whose earlier trials are missing
+    from the kinetics release contribute nothing and are left out of ``subjects``.
+    """
+    cohort = analysis.kinetics
+    analysis.references.kinetics_within_subject = None
+    if cohort is None or not cohort.earlier_torque_data:
+        return
+
+    paired = [subject for subject in cohort.subjects if subject in cohort.earlier_torque_data]
+    if not paired:
+        return
+
+    reliability = _metrics(paired, cohort.torque_names, cohort.grf_names)
+    for subject in paired:
+        position = cohort.subjects.index(subject)
+        _score_pair(
+            cohort.torque_data[position],
+            cohort.earlier_torque_data[subject],
+            cohort.torque_names,
+            reliability.torque_rmse,
+            reliability.torque_corr,
+            "all_moments",
+        )
+        _score_pair(
+            cohort.grf_data[position],
+            cohort.earlier_grf_data[subject],
+            cohort.grf_names,
+            reliability.grf_rmse,
+            reliability.grf_corr,
+            "all_grf",
+        )
+    _finalize(reliability)
+    analysis.references.kinetics_within_subject = reliability
+
+
 def compute_kinetics_metrics(analysis: GaitAnalysis) -> None:
-    """Compute human-human, population, and subject-matched kinetic scores."""
+    """Compute human-human, within-subject, population, and subject-matched kinetic scores."""
     cohort = analysis.kinetics
     if cohort is None:
+        analysis.references.kinetics_within_subject = None
         return
+    _compute_within_subject_reliability(analysis)
     torque_names = cohort.torque_names
     grf_names = cohort.grf_names
 
@@ -189,6 +231,17 @@ def write_kinetics_metrics(analysis: GaitAnalysis) -> Path | None:
             metrics=human,
         )
     )
+    within = analysis.references.kinetics_within_subject
+    if within is not None:
+        rows.extend(
+            _metric_rows(
+                policy_id="",
+                label="Human within-subject (Trial 5 vs Trials 1-4)",
+                scope="human_within_subject",
+                unit_ids=[str(subject) for subject in within.subjects],
+                metrics=within,
+            )
+        )
     for run in analysis.policies:
         if run.kinetics_population is None or run.kinetics_per_subject is None:
             raise RuntimeError(f"Policy {run.policy.id!r} kinetics metrics have not been computed.")
