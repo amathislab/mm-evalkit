@@ -6,7 +6,7 @@ from pathlib import Path
 
 import numpy as np
 
-from mm_evalkit.activation import activation_sample_phase, align_activation_to_observation_timeline
+from mm_evalkit.activation import load_emg_signal
 from mm_evalkit.datasets.ultra_mocap import find_preprocessed_emg, load_aligned_emg
 from mm_evalkit.paths import resolve_dataset_path
 from mm_evalkit.rendering.models import CameraConfig, RenderClip, SignalComparison, TendonSignal
@@ -34,6 +34,7 @@ def prepare_clip(
     episode: int,
     trial_stem: str,
     dataset_dir: str | Path | None = None,
+    emg_signal: str = "ctrl",
     cycles: int = 4,
     cycle_offset: int = 0,
     camera_azimuth: float = 90.0,
@@ -53,13 +54,9 @@ def prepare_clip(
     with np.load(source, allow_pickle=True) as archive:
         prefix = f"episode_{episode}"
         qpos = np.asarray(archive[f"{prefix}_joint_positions"], dtype=float)
-        exported = np.asarray(archive[f"{prefix}_muscle_activations"], dtype=float)
         reference = np.asarray(archive[f"{prefix}_traj_qpos"], dtype=float)[: len(qpos)]
         joint_names = [str(name) for name in archive["joint_names"]]
-        activation = align_activation_to_observation_timeline(
-            exported,
-            activation_sample_phase(archive),
-        )
+        activation = load_emg_signal(archive, episode, emg_signal)
     if len(activation) != len(qpos):
         raise ValueError("The rollout must contain one activation row per qpos row.")
 
@@ -107,7 +104,7 @@ def prepare_clip(
             policy=policy_clip[:, index],
             color=COLORS[index],
             human_label="Recorded sEMG",
-            policy_label="Artificial activation",
+            policy_label="Artificial excitation (ctrl)" if emg_signal == "ctrl" else "Artificial activation",
         )
         for index, label in enumerate(labels)
     )
@@ -138,5 +135,5 @@ def prepare_clip(
         subtitle=f"{trial_stem} | recorded right-arm sEMG",
         tendon_signals=tendon_signals,
         boundaries=boundaries,
-        metadata={"dataset": "ultra-mocap", "trial": trial_stem, "emg_path": str(emg_path)},
+        metadata={"dataset": "ultra-mocap", "trial": trial_stem, "emg_path": str(emg_path), "emg_signal": emg_signal},
     )

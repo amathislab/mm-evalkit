@@ -82,22 +82,24 @@ def compute_within_subject_variability(records):
     """Each subject's repetition-to-repetition agreement, averaged over subjects.
 
     Per trial the metric is computed between **every pair of that subject's individual
-    repetitions** and averaged over the pairs (see :func:`trial_metrics`); the value
-    for a movement/condition is then the mean over the subjects that have that trial.
-    Returned keyed by ``(movement, condition)`` in the same shape as a trial's metrics,
-    so the bars draw it as one extra grey bar per group beside the between-subject one.
+    repetitions** and averaged over the pairs (see :func:`trial_metrics`); the value for a
+    movement is then the mean over every trial of that movement, across both its speed
+    conditions and its subjects. Returned keyed by movement in the same shape as a trial's
+    metrics, so the bars draw it as one extra grey bar per group beside the
+    between-subject one.
 
-    Each row of the returned ``*_by`` arrays is one subject, so the bar's whisker is
-    the spread of this quantity *between* subjects.
+    Each row of the returned ``*_by`` arrays is one trial, so the bar's whisker is the
+    spread of this quantity across the trials behind the movement.
 
-    This is a single-repetition quantity -- how far one repetition of the same person
-    is from another. It is deliberately not the ceiling the policy bars are up against:
-    those are scored on the average of every repetition, and the matched ceiling for
-    that is the split-half tick (see :func:`compute_within_subject_reference`).
+    This is a single-repetition quantity -- how far one repetition of the same person is
+    from another, while the policy bars are scored on the average of every repetition. It
+    is the only within-subject reference the figures draw; the split-half ceiling is still
+    computed per trial (see :func:`compute_within_subject_reference`) but is no longer
+    reported, because with so few repetitions per trial it was the noisier of the two.
     """
     by_group = {}
-    for (movement, condition, _), metrics in records.items():
-        by_group.setdefault((movement, condition), []).append(metrics)
+    for (movement, _, _), metrics in records.items():
+        by_group.setdefault(movement, []).append(metrics)
 
     reference = {}
     for group, trials in by_group.items():
@@ -110,7 +112,7 @@ def compute_within_subject_variability(records):
             rows = [metrics[source] for metrics in trials if source in metrics]
             if not rows:
                 continue
-            stacked = np.asarray(rows)  # (n_subjects, n_channels)
+            stacked = np.asarray(rows)  # (n_trials, n_channels)
             entry[f"{target}_by"] = stacked
             entry[target] = np.nanmean(stacked, axis=1)
         if entry:
@@ -119,7 +121,7 @@ def compute_within_subject_variability(records):
 
 
 def compute_between_subject_reference(records):
-    """How far two *real* subjects are from each other, per movement/condition.
+    """How far two *real* subjects are from each other, per movement.
 
     The policy bars say how well the policy matches its own subject; on their own
     they don't say whether that is good. This computes the same two scores between
@@ -131,16 +133,21 @@ def compute_between_subject_reference(records):
     It is computed on trial-average cycles, which is exactly how the policy is now
     scored, so the two are directly comparable.
 
-    Returns ``{(movement, condition): metrics}`` in the same shape as a trial's
-    metrics, so the bars are drawn by the same code. Movement/conditions with fewer
-    than two subjects are absent (no pair to compare).
-    """
-    by_group = {}
-    for (movement, condition, _), metrics in records.items():
-        by_group.setdefault((movement, condition), []).append(metrics)
+    Subjects are paired **within one speed condition** -- comparing one subject's slow
+    arm swing against another's fast one would measure the speed difference, not the
+    between-subject difference -- and the pairs of every speed of a movement are then
+    pooled into that movement's sample.
 
-    reference = {}
-    for group, trials in by_group.items():
+    Returns ``{movement: metrics}`` in the same shape as a trial's metrics, so the bars
+    are drawn by the same code. Movements whose every speed has fewer than two subjects
+    are absent (no pair to compare).
+    """
+    by_condition = {}
+    for (movement, condition, _), metrics in records.items():
+        by_condition.setdefault((movement, condition), []).append(metrics)
+
+    per_condition = {}
+    for group, trials in by_condition.items():
         entry = {}
         joints = [m["ref_cycle"] for m in trials if "ref_cycle" in m]
         if len(joints) > 1:
@@ -162,7 +169,15 @@ def compute_between_subject_reference(records):
             if pair_rsa:
                 entry["muscle_rsa"] = np.asarray(pair_rsa, dtype=float)
         if entry:
-            reference[group] = entry
+            per_condition[group] = entry
+
+    # Every row of every array is one subject pair, so pooling the speeds of a movement
+    # is a concatenation along the pair axis.
+    reference = {}
+    for (movement, _), entry in sorted(per_condition.items()):
+        pooled = reference.setdefault(movement, {})
+        for name, values in entry.items():
+            pooled[name] = np.concatenate([pooled[name], values]) if name in pooled else values
     return reference
 
 

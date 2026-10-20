@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from .constants import RSA_PAIRS_NOTE
+from .figures import FIGURE_TITLE_SIZE, PANEL_TITLE_SIZE, SMALL_TEXT_SIZE, TICK_SIZE, save_figure
 
 
 def plot_rsm_matrices(policy_records, policies, real_records, channel_labels, plots_dir):
@@ -41,9 +42,9 @@ def plot_rsm_matrices(policy_records, policies, real_records, channel_labels, pl
         fig, axes = plt.subplots(1, len(panels), figsize=(3.1 * len(panels) + 1.0, 3.9), squeeze=False)
         for ax, (label, matrix) in zip(axes[0], panels, strict=True):
             ax.imshow(matrix, vmin=-1, vmax=1, cmap="RdBu_r", interpolation="nearest")
-            ax.set_xticks(range(len(channel_labels)), channel_labels, fontsize=7, rotation=35, ha="right")
-            ax.set_yticks(range(len(channel_labels)), channel_labels, fontsize=7)
-            ax.set_title(label.replace("\n", " "), fontsize=9)
+            ax.set_xticks(range(len(channel_labels)), channel_labels, fontsize=TICK_SIZE, rotation=35, ha="right")
+            ax.set_yticks(range(len(channel_labels)), channel_labels, fontsize=TICK_SIZE)
+            ax.set_title(label.replace("\n", " "), fontsize=PANEL_TITLE_SIZE)
             for i in range(matrix.shape[0]):
                 for j in range(matrix.shape[1]):
                     ax.text(
@@ -52,16 +53,18 @@ def plot_rsm_matrices(policy_records, policies, real_records, channel_labels, pl
                         f"{matrix[i, j]:.2f}",
                         ha="center",
                         va="center",
-                        fontsize=7,
+                        fontsize=SMALL_TEXT_SIZE,
                         color="white" if abs(matrix[i, j]) > 0.55 else "0.15",
                     )
-        fig.suptitle(f"{movement} {condition} - muscle RSMs, mean over {len(subjects)} subject(s)", fontsize=11)
+        fig.suptitle(
+            f"{movement} {condition} - muscle RSMs, mean over {len(subjects)} subject(s)", fontsize=FIGURE_TITLE_SIZE
+        )
         fig.text(
             0.005,
             0.005,
             "Electrode x electrode correlation over the average cycle; RSA compares the "
             f"lower triangles against the real panel ({RSA_PAIRS_NOTE}).",
-            fontsize=7,
+            fontsize=SMALL_TEXT_SIZE,
             va="bottom",
             ha="left",
             color="0.3",
@@ -69,7 +72,6 @@ def plot_rsm_matrices(policy_records, policies, real_records, channel_labels, pl
         fig.tight_layout(rect=(0, 0.05, 1, 0.97))
         out_path = os.path.join(plots_dir, f"{movement}_{condition}", "rsms.png")
         os.makedirs(os.path.dirname(out_path), exist_ok=True)
-        fig.savefig(out_path, dpi=130)
-        plt.close(fig)
+        save_figure(fig, out_path, announce="saved")
         n_saved += 1
     print(f"saved {n_saved} muscle RSM figures")

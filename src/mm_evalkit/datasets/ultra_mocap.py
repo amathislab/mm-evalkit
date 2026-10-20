@@ -26,14 +26,21 @@ def find_preprocessed_emg(
     trial_stem: str,
     roots: Collection[str | Path],
 ) -> Path:
-    """Require the unique preprocessed sEMG CSV for one trial."""
+    """Require the unique preprocessed sEMG CSV for one trial.
+
+    A root may be a directory of subject folders, or the dataset directory
+    holding the release's subject-folder directories (the published ULTRA-MoCap
+    archive splits its subjects across ``ULTra-MoCap-raw-0`` and
+    ``ULTra-MoCap-raw-1``), so both depths are searched. The match must still be
+    unique: two copies of one trial are an input error, not a preference.
+    """
     target = f"{trial_stem}_preprocessed".casefold()
     matches: list[Path] = []
     for root in roots:
-        pattern = Path(root) / subject
-        matches.extend(
-            path for path in pattern.glob("*/EMG_preprocessed/*_preprocessed.csv") if path.stem.casefold() == target
-        )
+        for pattern in (f"{subject}/*/EMG_preprocessed", f"*/{subject}/*/EMG_preprocessed"):
+            matches.extend(
+                path for path in Path(root).glob(f"{pattern}/*_preprocessed.csv") if path.stem.casefold() == target
+            )
     unique = sorted(set(matches))
     if len(unique) > 1:
         listed = "\n".join(f"  - {path}" for path in unique)

@@ -8,10 +8,7 @@ from pathlib import Path
 
 import numpy as np
 
-from mm_evalkit.activation import (
-    activation_sample_phase,
-    align_activation_to_observation_timeline,
-)
+from mm_evalkit.activation import load_emg_signal
 from mm_evalkit.datasets.ultra_mocap import find_preprocessed_emg, load_aligned_emg
 from mm_evalkit.workflows.bimanual.segmentation import (
     complete_cycle_boundaries,
@@ -34,6 +31,8 @@ def load_trial(
     groups: Sequence[MuscleGroup],
     arm: Arm,
     emg_roots: Sequence[Path],
+    *,
+    emg_signal: str = "ctrl",
 ) -> TrialData:
     """Align and segment one rollout episode.
 
@@ -49,10 +48,7 @@ def load_trial(
 
     policy_qpos = np.asarray(trajectory[f"{prefix}_joint_positions"], dtype=float) * 180.0 / math.pi
     reference_qpos = np.asarray(trajectory[f"{prefix}_traj_qpos"], dtype=float) * 180.0 / math.pi
-    policy_activation = align_activation_to_observation_timeline(
-        trajectory[f"{prefix}_muscle_activations"],
-        activation_sample_phase(trajectory),
-    )
+    policy_activation = load_emg_signal(trajectory, episode, emg_signal)
 
     rollout_frames = len(policy_qpos)
     reference_qpos = reference_qpos[:rollout_frames]

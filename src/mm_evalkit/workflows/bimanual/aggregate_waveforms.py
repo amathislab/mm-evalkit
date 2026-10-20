@@ -18,6 +18,29 @@ def _stack_cycles(records, keys, field):
     return stacked.mean(axis=0), stacked.std(axis=0)
 
 
+def _stack_movement_cycles(records, movement, subjects, field):
+    """Mean and standard deviation over subject cycles of one movement.
+
+    A subject's speed conditions are averaged into one cycle before the subjects are
+    stacked, so the band stays the spread *between subjects* however many speeds each of
+    them was recorded at. Cycles are time-normalized to 0-100%, so averaging across
+    speeds averages the shape of the movement, not its duration.
+    """
+    arrays = []
+    for subject in subjects:
+        cycles = [
+            metrics[field]
+            for (trial_movement, _, trial_subject), metrics in records.items()
+            if trial_movement == movement and trial_subject == subject and field in metrics
+        ]
+        if cycles:
+            arrays.append(np.mean(cycles, axis=0))
+    if not arrays:
+        return None
+    stacked = np.asarray(arrays)
+    return stacked.mean(axis=0), stacked.std(axis=0)
+
+
 def plot_aggregated_waveforms(
     policy_records,
     policies,
@@ -27,6 +50,7 @@ def plot_aggregated_waveforms(
     plots_dir,
     *,
     arm="right",
+    emg_signal="ctrl",
 ):
     """Plot each condition averaged over subjects.
 
@@ -107,9 +131,10 @@ def plot_aggregated_waveforms(
                 ],
                 title=f"{movement} {condition} ({arm} arm) - muscles{tag}",
                 out_path=output_dir / "aggregated_muscles.png",
-                ylabel="policy activation",
-                twin_series=([("Real EMG (MVC-norm)", "0.4", *real_emg)] if real_emg is not None else None),
-                twin_ylabel=("EMG (fraction MVC)" if real_emg is not None else ""),
+                ylabel="policy activation" if emg_signal == "activations"
+                else "policy muscle signal",
+                twin_series=([("Real EMG (subject-peak norm)", "0.4", *real_emg)] if real_emg is not None else None),
+                twin_ylabel=("EMG (fraction subject task peak)" if real_emg is not None else ""),
             )
             saved += 1
     print(f"saved {saved} subject-aggregated waveform figures (band = between-subject spread)")

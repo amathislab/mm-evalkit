@@ -28,6 +28,15 @@ import matplotlib.pyplot as plt
 import numpy as np
 from scipy.signal import find_peaks, savgol_filter
 
+from .figures import (
+    AXIS_LABEL_SIZE,
+    FIGURE_TITLE_SIZE,
+    PANEL_TITLE_SIZE,
+    SMALL_TEXT_SIZE,
+    TICK_SIZE,
+    save_figure,
+)
+
 # Declared coordinate that defines one repetition for each movement.
 MOVEMENT_CRITICAL_JOINT = {
     "ArmSwing": "shoulder_elv",
@@ -323,12 +332,12 @@ def plot_average_cycles(
                 zorder=2,
             )
             handles.append(line)
-        ax.set_title(name, fontsize=9)
-        ax.tick_params(labelsize=7)
+        ax.set_title(name, fontsize=PANEL_TITLE_SIZE)
+        ax.tick_params(labelsize=TICK_SIZE)
         if idx % ncols == 0:
-            ax.set_ylabel(ylabel, fontsize=8)
+            ax.set_ylabel(ylabel, fontsize=AXIS_LABEL_SIZE)
         if idx // ncols == nrows - 1:
-            ax.set_xlabel("movement cycle (%)", fontsize=8)
+            ax.set_xlabel("movement cycle (%)", fontsize=AXIS_LABEL_SIZE)
 
         if twin_series is not None:
             ax_twin = ax.twinx()
@@ -338,18 +347,17 @@ def plot_average_cycles(
                 (line,) = ax_twin.plot(phase, mean[idx], color=color, lw=1.6, ls=linestyle, label=label)
                 ax_twin.fill_between(phase, mean[idx] - std[idx], mean[idx] + std[idx], color=color, alpha=0.15)
                 handles.append(line)
-            ax_twin.tick_params(axis="y", labelsize=7, labelcolor="0.4")
+            ax_twin.tick_params(axis="y", labelsize=TICK_SIZE, labelcolor="0.4")
             if idx % ncols == ncols - 1 or idx == n - 1:
-                ax_twin.set_ylabel(twin_ylabel, fontsize=8, color="0.4")
+                ax_twin.set_ylabel(twin_ylabel, fontsize=AXIS_LABEL_SIZE, color="0.4")
 
         if idx == 0 or faint_handles:
             entries = (handles if idx == 0 else []) + faint_handles
-            ax.legend(entries, [h.get_label() for h in entries], fontsize=6.5, loc="best")
+            ax.legend(entries, [h.get_label() for h in entries], fontsize=SMALL_TEXT_SIZE, loc="best")
 
     for j in range(n, nrows * ncols):
         axes[j // ncols][j % ncols].axis("off")
 
-    fig.suptitle(title, fontsize=12)
+    fig.suptitle(title, fontsize=FIGURE_TITLE_SIZE)
     fig.tight_layout(rect=(0, 0, 1, 0.97))
-    fig.savefig(out_path, dpi=130)
-    plt.close(fig)
+    save_figure(fig, out_path)

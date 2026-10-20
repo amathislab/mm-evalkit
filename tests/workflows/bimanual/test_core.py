@@ -10,6 +10,7 @@ import pandas as pd
 import pytest
 
 from mm_evalkit.datasets.ultra_mocap import (
+    find_preprocessed_emg,
     load_aligned_emg,
 )
 from mm_evalkit.policies import PolicySpec
@@ -20,16 +21,20 @@ from mm_evalkit.workflows.bimanual.metrics import (
     _row_rmse,
     pairwise_corr,
     split_half,
+    trial_metrics,
 )
 from mm_evalkit.workflows.bimanual.models import (
     AnalysisConfig,
+    PolicyAnalysis,
     RolloutMetadata,
+    TrialData,
 )
 from mm_evalkit.workflows.bimanual.muscles import (
     build_muscle_groups,
 )
 from mm_evalkit.workflows.bimanual.pipeline import (
     analyse_policy,
+    restrict_to_shared_repetitions,
     validate_comparable_trials,
 )
 from mm_evalkit.workflows.bimanual.references import (
@@ -400,9 +405,11 @@ def test_policy_comparison_checks_only_requested_episode_subset(tmp_path):
         )
 
 
+@pytest.mark.parametrize("emg_signal", ["ctrl", "activations"])
 def test_analyse_policy_runs_alignment_segmentation_and_exact_metrics(
     tmp_path,
     monkeypatch,
+    emg_signal,
 ):
     root = tmp_path / "emg"
     emg_dir = root / "P11" / "Arm Swing" / "EMG_preprocessed"
@@ -429,6 +436,7 @@ def test_analyse_policy_runs_alignment_segmentation_and_exact_metrics(
         episode_0_traj_length=np.array(8),
         episode_0_joint_positions=np.ones((8, 1)),
         episode_0_muscle_activations=activations,
+        episode_0_muscle_commands=activations * 0.2 + 0.3,
         episode_0_traj_qpos=np.zeros((8, 1)),
     )
     monkeypatch.setattr(
@@ -456,6 +464,7 @@ def test_analyse_policy_runs_alignment_segmentation_and_exact_metrics(
         arm="right",
         all_joints=True,
         raw_trials=False,
+        emg_signal=emg_signal,
     )
     result = analyse_policy(
         policy,
@@ -467,6 +476,10 @@ def test_analyse_policy_runs_alignment_segmentation_and_exact_metrics(
         joint_selection=[0],
     )
 
+    np.testing.assert_array_equal(
+        result.trials[("ArmSwing", "Slow", "P11")].policy_activation,
+        activations * 0.2 + 0.3 if emg_signal == "ctrl" else activations,
+    )
     assert result.requested_episodes == 1
     assert result.exclusions == ()
     assert set(result.records) == {("ArmSwing", "Slow", "P11")}
@@ -610,6 +623,158 @@ def test_policy_comparison_requires_identical_trial_and_cycle_sets():
         validate_comparable_trials(results, policies)
 
 
+_REFERENCE_QPOS = np.linspace(0.0, 1.1, 12)[:, None]
+
+
+def _segmented_trial(*, episode: int, boundaries, cycle_values):
+    """One trial whose repetitions carry a distinguishable constant per cycle.
+
+    Every policy sees the same reference recording, cut to the span it rolled
+    out -- which is what makes a shorter rollout segment fewer repetitions.
+    """
+    frames = max(end for _, end in boundaries)
+    return TrialData(
+        episode=episode,
+        stem="P11_ArmSwing_Slow",
+        subject="P11",
+        movement="ArmSwing",
+        condition="Slow",
+        rollout_frames=frames,
+        reference_frames=frames,
+        early_stop_label="",
+        policy_qpos=np.linspace(0.0, 1.0, frames)[:, None],
+        reference_qpos=_REFERENCE_QPOS[:frames],
+        policy_activation=np.zeros((frames, 4)),
+        emg=pd.DataFrame(np.zeros((frames, 3))),
+        exclusion_reason=None,
+        cycle_boundaries=tuple(boundaries),
+        muscle_cycle_boundaries=tuple(boundaries),
+        activation_cycles=np.stack([np.full((4, 100), value) + np.linspace(0.0, 1.0, 100) for value in cycle_values]),
+        emg_cycles=np.stack([np.full((3, 100), value) + np.linspace(0.0, 1.0, 100) for value in cycle_values]),
+    )
+
+
+def _restriction_fixture():
+    """Two policies where the second segmented one extra trial and extra cycles."""
+    policies = [
+        PolicySpec("first", "First", Path("first.npz"), "blue"),
+        PolicySpec("second", "Second", Path("second.npz"), "red"),
+    ]
+    groups, muscle_columns = build_muscle_groups(["BIClong", "BICshort", "TRIlong", "DELT2"], suffix="")
+    shared_key = ("ArmSwing", "Slow", "P11")
+    extra_key = ("OverheadReach", "Max", "P13")
+
+    early_stop = _segmented_trial(episode=0, boundaries=[(0, 4), (4, 8)], cycle_values=[1.0, 2.0])
+    complete = _segmented_trial(episode=0, boundaries=[(0, 4), (4, 8), (8, 12)], cycle_values=[1.0, 2.0, 3.0])
+    only_second = _segmented_trial(episode=7, boundaries=[(0, 4)], cycle_values=[9.0])
+
+    results = {
+        "first": PolicyAnalysis(
+            trials={shared_key: early_stop},
+            records={shared_key: trial_metrics(early_stop, groups, [0])},
+            exclusions=(),
+            requested_episodes=2,
+        ),
+        "second": PolicyAnalysis(
+            trials={shared_key: complete, extra_key: only_second},
+            records={
+                shared_key: trial_metrics(complete, groups, [0]),
+                extra_key: trial_metrics(only_second, groups, [0]),
+            },
+            exclusions=(),
+            requested_episodes=2,
+        ),
+    }
+    return policies, groups, results, shared_key, extra_key
+
+
+def test_comparison_uses_only_repetitions_every_policy_segmented(capsys):
+    """An early-terminating policy narrows the sample instead of failing the run."""
+    policies, groups, results, shared_key, extra_key = _restriction_fixture()
+
+    restricted = restrict_to_shared_repetitions(results, policies, groups, [0])
+
+    # The trial only the second policy segmented leaves the comparison entirely.
+    assert set(restricted["first"].trials) == {shared_key}
+    assert set(restricted["second"].trials) == {shared_key}
+    # ... and the shared trial is cut back to the repetitions both of them have.
+    for policy_id in ("first", "second"):
+        trial = restricted[policy_id].trials[shared_key]
+        assert trial.cycle_boundaries == ((0, 4), (4, 8))
+        assert trial.muscle_cycle_boundaries == ((0, 4), (4, 8))
+        assert len(trial.emg_cycles) == 2
+    # The retained rows keep the values they were resampled to, so the third
+    # repetition's data cannot leak into the comparison.
+    np.testing.assert_allclose(
+        restricted["second"].trials[shared_key].emg_cycles,
+        results["second"].trials[shared_key].emg_cycles[:2],
+    )
+    # Both policies now describe the same real repetitions.
+    validate_comparable_trials(restricted, policies)
+    assert (
+        select_reference_record([(policy, restricted[policy.id].records[shared_key]) for policy in policies])
+        is not None
+    )
+    assert "restricted to 2 repetition(s)" in capsys.readouterr().out
+
+
+def test_every_comparison_exclusion_is_reported(capsys):
+    """Nothing leaves the comparison without appearing in the audit trail."""
+    policies, groups, results, _, extra_key = _restriction_fixture()
+
+    restricted = restrict_to_shared_repetitions(results, policies, groups, [0])
+
+    assert restricted["first"].exclusions == ()
+    dropped = restricted["second"].exclusions
+    assert len(dropped) == 1
+    assert dropped[0].stage == "comparability"
+    assert dropped[0].reason == "trial not segmented by every compared policy"
+    assert "first" in dropped[0].detail
+    assert "P13 OverheadReach Max: segmented only by second" in capsys.readouterr().out
+    assert extra_key not in restricted["second"].trials
+
+
+def test_single_policy_analysis_keeps_every_segmented_trial():
+    """With nothing to compare against, no repetition is dropped."""
+    policies, groups, results, shared_key, extra_key = _restriction_fixture()
+    single = [policies[1]]
+
+    restricted = restrict_to_shared_repetitions(results, single, groups, [0])
+
+    assert set(restricted["second"].trials) == {shared_key, extra_key}
+    assert restricted["second"].trials[shared_key].cycle_boundaries == ((0, 4), (4, 8), (8, 12))
+
+
+def _write_emg_csv(path: Path) -> Path:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("time,IM EMG4\n0.00,0.1\n0.01,0.2\n", encoding="utf-8")
+    return path
+
+
+def test_emg_discovery_accepts_the_published_release_layout(tmp_path):
+    """The archive splits its subjects across release directories under one root."""
+    expected = _write_emg_csv(
+        tmp_path / "ULTra-MoCap-raw-1" / "P11" / "Arm Swing" / "EMG_preprocessed" / "P11_ArmSwing_Slow_preprocessed.csv"
+    )
+
+    assert find_preprocessed_emg("P11", "P11_ArmSwing_Slow", [tmp_path]) == expected
+    # A root that is itself the subject-folder directory still resolves.
+    assert find_preprocessed_emg("P11", "P11_ArmSwing_Slow", [tmp_path / "ULTra-MoCap-raw-1"]) == expected
+
+
+def test_emg_discovery_still_refuses_an_ambiguous_match(tmp_path):
+    """Deeper searching must not turn two copies of a trial into a silent choice."""
+    _write_emg_csv(
+        tmp_path / "ULTra-MoCap-raw-0" / "P11" / "Arm Swing" / "EMG_preprocessed" / "P11_ArmSwing_Slow_preprocessed.csv"
+    )
+    _write_emg_csv(
+        tmp_path / "ULTra-MoCap-raw-1" / "P11" / "Arm Swing" / "EMG_preprocessed" / "P11_ArmSwing_Slow_preprocessed.csv"
+    )
+
+    with pytest.raises(ValueError, match="Multiple preprocessed EMG files match"):
+        find_preprocessed_emg("P11", "P11_ArmSwing_Slow", [tmp_path])
+
+
 def test_trial_requires_a_preprocessed_emg_recording(tmp_path):
     groups, muscle_columns = build_muscle_groups(
         ["BIClong", "BICshort", "TRIlong", "DELT2"],
@@ -621,6 +786,7 @@ def test_trial_requires_a_preprocessed_emg_recording(tmp_path):
         "episode_0_joint_positions": np.zeros((8, 1)),
         "episode_0_traj_qpos": np.zeros((8, 1)),
         "episode_0_muscle_activations": np.zeros((8, 4)),
+        "episode_0_muscle_commands": np.zeros((8, 4)),
     }
 
     with pytest.raises(FileNotFoundError, match="No preprocessed EMG file matches"):
@@ -663,6 +829,7 @@ def test_trial_uses_identical_complete_cycles_for_activation_and_emg(
         "episode_0_joint_positions": np.zeros((8, 1)),
         "episode_0_traj_qpos": np.zeros((8, 1)),
         "episode_0_muscle_activations": np.arange(32, dtype=float).reshape(8, 4),
+        "episode_0_muscle_commands": np.arange(32, dtype=float).reshape(8, 4) + 100,
     }
     selector_call = {}
 
@@ -708,7 +875,7 @@ def test_trial_uses_identical_complete_cycles_for_activation_and_emg(
     assert trial.muscle_cycle_boundaries == trial.cycle_boundaries
     np.testing.assert_array_equal(
         trial.policy_activation,
-        trajectory["episode_0_muscle_activations"],
+        np.clip(trajectory["episode_0_muscle_commands"], 0, 1),
     )
     assert selector_call["names"] == ["shoulder_elv_r"]
     assert selector_call["movement"] == "ArmSwing"

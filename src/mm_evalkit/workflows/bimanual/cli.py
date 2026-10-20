@@ -8,6 +8,7 @@ from pathlib import Path
 
 from ...cli_options import (
     add_dataset_dir,
+    add_emg_signal,
     add_motion_group,
     add_plots_dir,
     add_policy_source,
@@ -23,11 +24,12 @@ from .pipeline import run_analysis
 def build_parser() -> argparse.ArgumentParser:
     """Describe only user-facing inputs; scientific work lives in the pipeline."""
     parser = argparse.ArgumentParser(
-        description=("Compare MyoBimanualArm policy activation with timestamp-aligned ULTRA-MoCap kinematics and EMG.")
+        description=("Compare MyoBimanualArm muscle signals with timestamp-aligned ULTRA-MoCap kinematics and EMG.")
     )
     add_policy_source(parser, allow_single_rollout=True)
     add_dataset_dir(parser, dataset="ultra-mocap", aliases=("ultramocap_roots",), multiple=True)
     add_motion_group(parser, choices=ULTRAMOCAP_MOTION_SETS)
+    add_emg_signal(parser)
     add_plots_dir(parser, default="mm_evalkit_outputs/ultramocap_bimanual")
     parser.add_argument(
         "--episodes",
@@ -90,6 +92,7 @@ def parse_options(argv: Sequence[str] | None = None) -> AnalysisConfig:
         arm=args.arm,
         all_joints=args.all_joints,
         raw_trials=args.raw_trials,
+        emg_signal=args.emg_signal,
     )
 
 

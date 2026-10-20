@@ -54,6 +54,7 @@ def save_run_manifest(
         "emg_roots": [str(path.resolve()) for path in options.emg_roots],
         "episodes": list(options.episodes) if options.episodes is not None else "all",
         "arm": options.arm,
+        "emg_signal": options.emg_signal,
         "all_joints": options.all_joints,
         "raw_trials": options.raw_trials,
         "policies": [

@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from dataclasses import replace
 
 from mm_evalkit.policies import PolicySpec
 
 from .aggregate_waveforms import plot_aggregated_waveforms
 from .constants import PRIMARY_JOINTS
+from .grids import plot_score_grid, plot_waveform_grid
 from .metrics import trial_metrics
 from .models import (
     AnalysisConfig,
@@ -24,12 +26,123 @@ from .statistics import run_wilcoxon_tests
 from .summary_plots import (
     plot_aggregated_bars,
     plot_aggregated_by_channel,
+    plot_metrics_summary_bars,
     plot_summary_bars,
     plot_summary_by_channel,
 )
 from .tables import plot_metrics_table
 from .trial_plots import plot_joint_trial, plot_muscle_trial, plot_trial_waveforms
 from .trials import load_trial
+
+
+def _shared_boundaries(trials, attribute: str) -> tuple:
+    """Repetition boundaries every policy detected for one trial, in order."""
+    per_policy = [getattr(trial, attribute) or () for trial in trials]
+    shared = set(per_policy[0]).intersection(*(set(item) for item in per_policy[1:]))
+    return tuple(boundary for boundary in per_policy[0] if boundary in shared)
+
+
+def _restrict_trial(trial, joint_boundaries: tuple, muscle_boundaries: tuple):
+    """Reduce one trial to a subset of the repetitions it segmented.
+
+    ``activation_cycles`` and ``emg_cycles`` are stored one row per entry of
+    ``muscle_cycle_boundaries``, so the rows are selected by position rather
+    than recomputed: the retained repetitions keep the values they were
+    originally resampled to.
+    """
+    if trial.cycle_boundaries == joint_boundaries and trial.muscle_cycle_boundaries == muscle_boundaries:
+        return trial
+    keep = [index for index, boundary in enumerate(trial.muscle_cycle_boundaries) if boundary in set(muscle_boundaries)]
+    return replace(
+        trial,
+        cycle_boundaries=joint_boundaries,
+        muscle_cycle_boundaries=muscle_boundaries,
+        activation_cycles=trial.activation_cycles[keep],
+        emg_cycles=trial.emg_cycles[keep],
+    )
+
+
+def restrict_to_shared_repetitions(results, policies, groups, joint_selection):
+    """Reduce every policy to the trials and repetitions all of them segmented.
+
+    Repetitions are detected from the reference kinematics, but only over the
+    span each policy actually rolled out, so a policy that terminates early
+    segments fewer repetitions -- or none -- for that trial. Comparing policies
+    on different repetitions would change the sample per policy, and refusing to
+    run at all would make any early-terminating policy impossible to evaluate.
+    The comparison is therefore restricted to the repetitions common to every
+    policy, and everything dropped is reported as a comparability exclusion.
+
+    Returns the restricted results; ``results`` itself is left unchanged.
+    """
+    if len(policies) < 2:
+        return results
+
+    per_policy_keys = [set(results[policy.id].trials) for policy in policies]
+    shared_keys = set.intersection(*per_policy_keys)
+
+    trials_by_key = {key: [results[policy.id].trials[key] for policy in policies] for key in shared_keys}
+    joint_boundaries = {key: _shared_boundaries(trials, "cycle_boundaries") for key, trials in trials_by_key.items()}
+    muscle_boundaries = {
+        key: _shared_boundaries(trials, "muscle_cycle_boundaries") for key, trials in trials_by_key.items()
+    }
+    # A trial with no repetition segmented by every policy carries no comparable
+    # sample at all, so it leaves the comparison entirely.
+    comparable_keys = {key for key in shared_keys if joint_boundaries[key] and muscle_boundaries[key]}
+
+    restricted = {}
+    for policy in policies:
+        analysis = results[policy.id]
+        trials, records = {}, {}
+        exclusions = list(analysis.exclusions)
+        for key, trial in analysis.trials.items():
+            if key not in comparable_keys:
+                other_ids = sorted(
+                    other.id for other in policies if other.id != policy.id and key not in results[other.id].trials
+                )
+                reason = (
+                    "no repetition segmented by every compared policy"
+                    if key in shared_keys
+                    else "trial not segmented by every compared policy"
+                )
+                detail = (
+                    f"trial={key}; segmented here but not by: {', '.join(other_ids)}"
+                    if other_ids
+                    else f"trial={key}; no repetition is common to every policy"
+                )
+                exclusions.append(
+                    EpisodeExclusion(
+                        episode=trial.episode,
+                        trial_stem=trial.stem,
+                        stage="comparability",
+                        reason=reason,
+                        detail=detail,
+                    )
+                )
+                continue
+            reduced = _restrict_trial(trial, joint_boundaries[key], muscle_boundaries[key])
+            trials[key] = reduced
+            if reduced is trial:
+                records[key] = analysis.records[key]
+            else:
+                dropped = len(trial.muscle_cycle_boundaries) - len(reduced.muscle_cycle_boundaries)
+                print(
+                    f"  {policy.id}: {key[2]} {key[0]} {key[1]} restricted to "
+                    f"{len(reduced.muscle_cycle_boundaries)} repetition(s) shared with every policy "
+                    f"({dropped} dropped)."
+                )
+                records[key] = trial_metrics(reduced, groups, joint_selection)
+        restricted[policy.id] = replace(analysis, trials=trials, records=records, exclusions=tuple(exclusions))
+
+    dropped_keys = sorted(set().union(*per_policy_keys) - comparable_keys)
+    if dropped_keys:
+        print(f"\nTrials excluded from the policy comparison: {len(dropped_keys)}")
+        for movement, condition, subject in dropped_keys:
+            holders = sorted(
+                policy.id for policy in policies if (movement, condition, subject) in results[policy.id].trials
+            )
+            print(f"  {subject} {movement} {condition}: segmented only by {', '.join(holders) or 'no policy'}")
+    return restricted
 
 
 def validate_comparable_trials(results, policies) -> None:
@@ -102,6 +215,7 @@ def analyse_policy(
                 groups,
                 options.arm,
                 options.emg_roots,
+                emg_signal=options.emg_signal,
             )
             if not trial.is_segmented:
                 exclusions.append(
@@ -177,6 +291,7 @@ def _plot_trial_comparisons(
             title=f"{subject} {movement} {condition} ({options.arm} arm) -",
             joints_path=str(out_dir / f"{subject}_joints.png"),
             muscles_path=str(out_dir / f"{subject}_muscles.png"),
+            emg_signal=options.emg_signal,
         )
 
         if not options.raw_trials:
@@ -202,6 +317,7 @@ def _plot_trial_comparisons(
                 muscle_entries,
                 title=(f"{trial.stem} - muscles ({options.arm} arm){trial.early_stop_label}"),
                 out_path=str(raw_dir / f"{subject}_muscles.png"),
+                emg_signal=options.emg_signal,
             )
 
 
@@ -221,7 +337,7 @@ def _plot_policy_summaries(
         tag = "" if len(policies) == 1 else f"\n{policy.label}"
         plot_summary_bars(
             records,
-            str(out_dir / "summary_per_condition.png"),
+            str(out_dir / "summary_per_movement.png"),
             arm=options.arm,
             tag=tag,
         )
@@ -230,7 +346,7 @@ def _plot_policy_summaries(
             "joint_rmse_by",
             joint_labels,
             "RMSE (deg)",
-            "Joint tracking error per joint, per movement/condition and subject "
+            "Joint tracking error per joint, per movement and subject "
             f"(bar = score of the repetition-averaged trial){tag}",
             str(out_dir / "summary_per_joint.png"),
         )
@@ -239,7 +355,7 @@ def _plot_policy_summaries(
             "muscle_corr_by",
             [group.title() for group in groups],
             "correlation (r)",
-            f"Muscle-group activation vs real EMG per electrode, per movement/condition and subject{tag}",
+            f"Muscle-group signal vs real EMG per electrode, per movement and subject{tag}",
             str(out_dir / "summary_per_muscle.png"),
             zero_line=True,
         )
@@ -259,7 +375,7 @@ def _plot_population_reports(
         policy_records,
         policies,
         real_records,
-        str(root / "aggregated_per_condition.png"),
+        str(root / "aggregated_per_movement.png"),
         arm=options.arm,
     )
     plot_aggregated_by_channel(
@@ -280,7 +396,7 @@ def _plot_population_reports(
         "muscle_corr_by",
         muscle_titles,
         "correlation (r)",
-        "Muscle-group activation vs real EMG per electrode, aggregated over subjects "
+        "Muscle-group signal vs real EMG per electrode, aggregated over subjects "
         "(bar = mean over subjects, whisker = between-subject spread)",
         str(root / "aggregated_per_muscle.png"),
         zero_line=True,
@@ -293,6 +409,7 @@ def _plot_population_reports(
         [f"{group.label}\n({group.channel})" for group in groups],
         str(root),
         arm=options.arm,
+        emg_signal=options.emg_signal,
     )
     plot_rsm_matrices(
         policy_records,
@@ -307,6 +424,62 @@ def _plot_population_reports(
         real_records,
         str(root / "metrics_summary_table"),
         arm=options.arm,
+    )
+    plot_metrics_summary_bars(
+        policy_records,
+        policies,
+        real_records,
+        str(root / "metrics_summary_bars"),
+        arm=options.arm,
+    )
+    # The whole channel x movement matrix on one page, as waveforms and as
+    # scores: the per-condition figures each cover one row of it.
+    plot_waveform_grid(
+        policy_records,
+        policies,
+        real_records,
+        joint_labels,
+        policy_field="pol_cycle",
+        real_field="ref_cycle",
+        ylabel="joint angle (deg)",
+        real_label="Real (retargeted)",
+        suptitle=f"Average movement cycle per joint and movement ({options.arm} arm)",
+        out_path=str(root / "grid_joint_waveforms"),
+    )
+    plot_waveform_grid(
+        policy_records,
+        policies,
+        real_records,
+        muscle_titles,
+        policy_field="act_cycle",
+        real_field="emg_cycle",
+        ylabel="policy muscle signal (left axis) vs real EMG (right axis)",
+        real_label="Real EMG (subject-peak norm)",
+        real_on_twin=True,
+        twin_ylabel="EMG (fraction subject task peak)",
+        suptitle=f"Average movement cycle per muscle group and movement ({options.arm} arm)",
+        out_path=str(root / "grid_muscle_waveforms"),
+    )
+    plot_score_grid(
+        policy_records,
+        policies,
+        real_records,
+        joint_labels,
+        key="joint_rmse_by",
+        ylabel="RMSE (deg)",
+        suptitle="Joint tracking error per joint and movement",
+        out_path=str(root / "grid_joint_scores"),
+    )
+    plot_score_grid(
+        policy_records,
+        policies,
+        real_records,
+        muscle_titles,
+        key="muscle_corr_by",
+        ylabel="correlation (r)",
+        suptitle="Muscle-group signal vs real EMG per electrode and movement",
+        out_path=str(root / "grid_muscle_scores"),
+        zero_line=True,
     )
     run_wilcoxon_tests(
         policy_records,
@@ -364,6 +537,7 @@ def run_analysis(options: AnalysisConfig) -> int:
         )
         for policy in policies
     }
+    results = restrict_to_shared_repetitions(results, policies, groups, joint_selection)
     validate_comparable_trials(results, policies)
     policy_records = {policy.id: results[policy.id].records for policy in policies}
     real_records = merge_real_records(policy_records, policies)

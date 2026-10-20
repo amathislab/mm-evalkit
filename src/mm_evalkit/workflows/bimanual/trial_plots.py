@@ -10,6 +10,14 @@ import numpy as np
 from mm_evalkit.workflows.bimanual.segmentation import plot_average_cycles
 
 from .constants import CONTROL_FREQUENCY_HZ, HEAD_COLORS
+from .figures import (
+    AXIS_LABEL_SIZE,
+    FIGURE_TITLE_SIZE,
+    PANEL_TITLE_SIZE,
+    SMALL_TEXT_SIZE,
+    TICK_SIZE,
+    save_figure,
+)
 from .references import select_reference_record
 
 
@@ -25,25 +33,23 @@ def plot_joint_trial(policy_qpos, ref_qpos, joint_names, title, out_path):
         ax = axes[idx // ncols][idx % ncols]
         ax.plot(t, ref_qpos[:, idx], color="0.4", lw=1.6, ls="--", label="Real (retargeted)")
         ax.plot(t, policy_qpos[:, idx], color="tab:blue", lw=1.4, label="Policy")
-        ax.set_title(name, fontsize=9)
-        ax.tick_params(labelsize=7)
+        ax.set_title(name, fontsize=PANEL_TITLE_SIZE)
+        ax.tick_params(labelsize=TICK_SIZE)
         if idx % ncols == 0:
-            ax.set_ylabel("angle (deg)", fontsize=8)
+            ax.set_ylabel("angle (deg)", fontsize=AXIS_LABEL_SIZE)
         if idx // ncols == nrows - 1:
-            ax.set_xlabel("time (s)", fontsize=8)
+            ax.set_xlabel("time (s)", fontsize=AXIS_LABEL_SIZE)
 
     for j in range(n, nrows * ncols):
         axes[j // ncols][j % ncols].axis("off")
 
-    axes[0][0].legend(fontsize=7, loc="best")
-    fig.suptitle(title, fontsize=12)
+    axes[0][0].legend(fontsize=SMALL_TEXT_SIZE, loc="best")
+    fig.suptitle(title, fontsize=FIGURE_TITLE_SIZE)
     fig.tight_layout(rect=(0, 0, 1, 0.97))
-    fig.savefig(out_path, dpi=130)
-    plt.close(fig)
-    print(f"  saved {out_path}")
+    save_figure(fig, out_path)
 
 
-def plot_muscle_trial(policy_act, emg_df, muscle_entries, title, out_path):
+def plot_muscle_trial(policy_act, emg_df, muscle_entries, title, out_path, *, emg_signal="ctrl"):
     """One subplot per simulated muscle: its policy activation vs the real EMG.
 
     ``muscle_entries`` is one ``(muscle, activation column, EMG channel, channel
@@ -72,12 +78,12 @@ def plot_muscle_trial(policy_act, emg_df, muscle_entries, title, out_path):
     for idx, (muscle, column, channel, label) in enumerate(muscle_entries):
         ax = axes[idx // ncols][idx % ncols]
 
-        (l_policy,) = ax.plot(t, policy_act[:, column], color="tab:blue", lw=1.4, label="Policy activation")
-        ax.set_xlabel("time (s)", fontsize=8)
-        ax.set_ylabel("policy activation", fontsize=8, color="tab:blue")
-        ax.tick_params(axis="y", labelcolor="tab:blue", labelsize=7)
-        ax.tick_params(axis="x", labelsize=7)
-        ax.set_title(f"{muscle}\n({channel}; {label})", fontsize=9)
+        (l_policy,) = ax.plot(t, policy_act[:, column], color="tab:blue", lw=1.4, label="Policy activation" if emg_signal == "activations" else "Policy ctrl")
+        ax.set_xlabel("time (s)", fontsize=AXIS_LABEL_SIZE)
+        ax.set_ylabel("policy activation" if emg_signal == "activations" else "policy ctrl", fontsize=AXIS_LABEL_SIZE, color="tab:blue")
+        ax.tick_params(axis="y", labelcolor="tab:blue", labelsize=TICK_SIZE)
+        ax.tick_params(axis="x", labelsize=TICK_SIZE)
+        ax.set_title(f"{muscle}\n({channel}; {label})", fontsize=PANEL_TITLE_SIZE)
 
         ax_emg = ax.twinx()
         (l_emg,) = ax_emg.plot(
@@ -88,23 +94,21 @@ def plot_muscle_trial(policy_act, emg_df, muscle_entries, title, out_path):
             ls="--",
             label="Real EMG (subject-peak norm)",
         )
-        ax_emg.set_ylabel("EMG (fraction subject task peak)", fontsize=8, color="0.4")
-        ax_emg.tick_params(axis="y", labelcolor="0.4", labelsize=7)
+        ax_emg.set_ylabel("EMG (fraction subject task peak)", fontsize=AXIS_LABEL_SIZE, color="0.4")
+        ax_emg.tick_params(axis="y", labelcolor="0.4", labelsize=TICK_SIZE)
 
         lines = [l_policy, l_emg]
-        ax.legend(lines, [line.get_label() for line in lines], fontsize=7, loc="upper right")
+        ax.legend(lines, [line.get_label() for line in lines], fontsize=SMALL_TEXT_SIZE, loc="upper right")
 
     for j in range(n_muscles, nrows * ncols):
         axes[j // ncols][j % ncols].axis("off")
 
-    fig.suptitle(title, fontsize=12)
+    fig.suptitle(title, fontsize=FIGURE_TITLE_SIZE)
     fig.tight_layout(rect=(0, 0, 1, 0.95))
-    fig.savefig(out_path, dpi=130)
-    plt.close(fig)
-    print(f"  saved {out_path}")
+    save_figure(fig, out_path)
 
 
-def plot_trial_waveforms(entries, groups, joint_sel_names, muscle_labels, title, joints_path, muscles_path):
+def plot_trial_waveforms(entries, groups, joint_sel_names, muscle_labels, title, joints_path, muscles_path, *, emg_signal="ctrl"):
     """Overlay every policy's average (+/-std) cycle for one trial on the real data.
 
     ``entries`` is ``[(policy, metrics)]`` in config order -- the policies that
@@ -145,7 +149,6 @@ def plot_trial_waveforms(entries, groups, joint_sel_names, muscle_labels, title,
         out_path=joints_path,
         ylabel="angle (deg)",
     )
-    print(f"  saved {joints_path}")
 
     # --- Muscles: one subplot per electrode, group means vs the real EMG ---
     heads = None
@@ -187,9 +190,9 @@ def plot_trial_waveforms(entries, groups, joint_sel_names, muscle_labels, title,
         ],
         title=f"{title} muscles{muscle_cycle_tag}",
         out_path=muscles_path,
-        ylabel="policy activation",
+        ylabel="policy activation" if emg_signal == "activations"
+        else "policy muscle signal",
         twin_series=twin,
         twin_ylabel=twin_ylabel,
         per_channel_series=heads,
     )
-    print(f"  saved {muscles_path}")

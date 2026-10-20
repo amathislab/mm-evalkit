@@ -29,6 +29,11 @@ class AnalysisConfig:
     arm: Arm
     all_joints: bool
     raw_trials: bool
+    emg_signal: str = "ctrl"
+
+    def __post_init__(self) -> None:
+        if self.emg_signal not in {"ctrl", "activations"}:
+            raise ValueError("emg_signal must be 'ctrl' or 'activations'.")
 
 
 @dataclass(frozen=True)
@@ -44,10 +49,15 @@ class RolloutMetadata:
 
 @dataclass(frozen=True)
 class EpisodeExclusion:
-    """A scientifically intentional episode exclusion."""
+    """A scientifically intentional episode exclusion.
+
+    ``segmentation`` exclusions are decided from one policy's own rollout;
+    ``comparability`` exclusions are decided across policies, when a trial or a
+    repetition is not available from every policy being compared.
+    """
 
     episode: int
-    stage: Literal["segmentation"]
+    stage: Literal["segmentation", "comparability"]
     reason: str
     trial_stem: str | None = None
     detail: str = ""
