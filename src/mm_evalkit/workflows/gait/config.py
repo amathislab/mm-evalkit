@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
+from mm_evalkit.activation import DEFAULT_MUSCLE_SIGNAL
 from mm_evalkit.paths import resolve_dataset_path
 from mm_evalkit.policies import (
     PolicySpec,
@@ -41,7 +42,7 @@ class FullBodyConfig:
     kinematics_source: KinematicsSource
     human_subject_policy: HumanSubjectPolicy = "drop-and-report"
     kinetics_reference_dir: Path | None = None
-    muscle_signal: MuscleSignal = "activation"
+    muscle_signal: MuscleSignal = DEFAULT_MUSCLE_SIGNAL
     kinetics_window: KineticsWindow = "left_heel_strike"
     extended_channels: bool = False
 
@@ -58,7 +59,7 @@ class FullBodyConfig:
         kinematics_source: str,
         human_subject_policy: str,
         kinetics_reference_dir: str | Path | None = None,
-        muscle_signal: str = "activation",
+        muscle_signal: str = DEFAULT_MUSCLE_SIGNAL,
         kinetics_window: str = "left_heel_strike",
         extended_channels: bool = False,
     ) -> FullBodyConfig:
@@ -78,9 +79,7 @@ class FullBodyConfig:
         if muscle_signal not in {"activation", "excitation"}:
             raise ValueError(f"muscle_signal must be 'activation' or 'excitation', got {muscle_signal!r}.")
         if kinetics_window not in {"left_heel_strike", "right_stride"}:
-            raise ValueError(
-                f"kinetics_window must be 'left_heel_strike' or 'right_stride', got {kinetics_window!r}."
-            )
+            raise ValueError(f"kinetics_window must be 'left_heel_strike' or 'right_stride', got {kinetics_window!r}.")
 
         resolved_subject_based = dataset_name == "Gait120" if subject_based is None else subject_based
         if extended_channels and dataset_name != "Gait120":

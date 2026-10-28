@@ -262,7 +262,10 @@ The comparison figure draws policy muscle **excitation** by default:
 Pass `--muscle_signal activation` for the exported `muscle_activations`. The
 muscle Pearson r follows the same choice, and a cached analysis is refused if
 it was built with the other signal. The analysis CLI takes the same
-`--muscle_signal` flag and defaults to activation.
+`--muscle_signal` flag and defaults to excitation, as does `FullBodyAnalysis`.
+Excitation requires exported `episode_N_muscle_commands`; archives that contain
+only activation must explicitly select `--muscle_signal activation` or
+`FullBodyAnalysis(..., muscle_signal="activation")` to retain the earlier analysis.
 
 Moments and vertical GRF use the fixed 1.00 s window from left heel strike by
 default, which every rollout covers completely; it sits about half a cycle out
@@ -323,6 +326,13 @@ Renderers synchronize policy motion with human and artificial muscle signals:
 mm-evalkit render gait120 --help
 mm-evalkit render ultra-mocap --help
 ```
+
+Gait120 video comparisons also default to excitation. Use
+`mm-evalkit render gait120 ... --muscle_signal activation` for activation.
+The selected signal controls both the policy EMG comparison and tendon styling;
+the video legend and metadata record its identity. Analysis and rendering share
+the same signal decoder and state timeline. Missing commands raise an error
+instead of falling back to activation. ULTRA-MoCap retains its activation protocol.
 
 ## Demos
 

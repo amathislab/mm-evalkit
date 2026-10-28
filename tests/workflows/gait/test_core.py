@@ -303,6 +303,7 @@ def test_early_termination_is_an_audited_scientific_exclusion(tmp_path: Path):
         episode_0_joint_positions=np.zeros((5, len(joint_names_myo) + 6)),
         episode_0_traj_qpos=np.zeros((10, len(joint_names_myo) + 6)),
         episode_0_muscle_activations=np.zeros((5, len(muscle_names_myo))),
+        episode_0_muscle_commands=np.zeros((5, len(muscle_names_myo))),
         episode_0_touch_observations=np.zeros((5, 4)),
     )
 

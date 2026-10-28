@@ -7,10 +7,10 @@ import math
 import numpy as np
 
 from mm_evalkit.activation import (
+    DEFAULT_MUSCLE_SIGNAL,
     activation_sample_phase,
-    align_activation_to_observation_timeline,
     complete_activation_gait_indexes,
-    excitation_from_commands,
+    muscle_signal_from_archive,
 )
 from mm_evalkit.policies import PolicySpec
 from mm_evalkit.workflows.gait.channels import joint_names_myo, muscle_names_myo
@@ -87,7 +87,7 @@ def extract_episode_gaits(
     expected_n=None,
     *,
     activation_phase=None,
-    muscle_signal="activation",
+    muscle_signal=DEFAULT_MUSCLE_SIGNAL,
 ):
     """Extracting gait cycles from a single episode trajectory.
 
@@ -100,14 +100,9 @@ def extract_episode_gaits(
     touch = policy_traj[f"episode_{episode}_touch_observations"]
     joint_data_myo = policy_traj[f"episode_{episode}_joint_positions"] * 180 / math.pi
     joint_data_myo_ref = policy_traj[f"episode_{episode}_traj_qpos"] * 180 / math.pi
-    if muscle_signal == "excitation":
-        muscle_data_myo = excitation_from_commands(policy_traj[f"episode_{episode}_muscle_commands"])
-    else:
-        phase = activation_sample_phase(policy_traj) if activation_phase is None else activation_phase
-        muscle_data_myo = align_activation_to_observation_timeline(
-            policy_traj[f"episode_{episode}_muscle_activations"],
-            phase,
-        )
+    muscle_data_myo = muscle_signal_from_archive(
+        policy_traj, episode, muscle_signal=muscle_signal, activation_phase=activation_phase
+    )
 
     feet_contacts = get_feet_contacts(touch_sensors_data=touch, threshold=0.05)
 
@@ -161,7 +156,7 @@ def extract_trajectory_data(
     *,
     subject_based: bool,
     motion_list=None,
-    muscle_signal="activation",
+    muscle_signal=DEFAULT_MUSCLE_SIGNAL,
 ) -> ExtractedRollout:
     """Extract and process trajectory data from a given .npz file path.
 
@@ -432,7 +427,7 @@ def load_policy_run(
     *,
     subject_based: bool,
     motion_list=None,
-    muscle_signal="activation",
+    muscle_signal=DEFAULT_MUSCLE_SIGNAL,
 ) -> PolicyRun:
     """Load one validated rollout and its optional earlier-trial companion."""
     if not isinstance(policy, PolicySpec):

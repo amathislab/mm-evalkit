@@ -10,6 +10,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from mm_evalkit.activation import DEFAULT_MUSCLE_SIGNAL
+
 from . import pipeline
 from .config import FullBodyConfig
 from .loading import load_gait_analysis
@@ -31,7 +33,7 @@ class FullBodyAnalysis:
         human_subject_policy: str = "drop-and-report",
         kinetics_reference_dir: str | Path | None = None,
         *,
-        muscle_signal: str = "activation",
+        muscle_signal: str = DEFAULT_MUSCLE_SIGNAL,
         kinetics_window: str = "left_heel_strike",
         extended_channels: bool = False,
         motion_list_Gait120: str | None = None,

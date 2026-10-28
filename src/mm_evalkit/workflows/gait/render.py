@@ -7,9 +7,9 @@ from pathlib import Path
 import numpy as np
 
 from mm_evalkit.activation import (
-    activation_sample_phase,
-    align_activation_to_observation_timeline,
+    DEFAULT_MUSCLE_SIGNAL,
     complete_activation_gait_indexes,
+    muscle_signal_from_archive,
 )
 from mm_evalkit.datasets.gait120 import Gait120_muscle_map, load_gait120_emg_step
 from mm_evalkit.paths import resolve_dataset_path
@@ -33,11 +33,14 @@ def prepare_clip(
     gait_index: int = 0,
     dataset_dir: str | Path | None = None,
     channels: tuple[str, ...] | list[str] = DEFAULT_CHANNELS,
+    muscle_signal: str = DEFAULT_MUSCLE_SIGNAL,
     camera_azimuth: float = 105.0,
     camera_elevation: float = -12.0,
     camera_distance: float = 2.4,
 ) -> RenderClip:
     """Prepare one policy stride against Gait120's phase-normalized human EMG."""
+    if muscle_signal not in {"activation", "excitation"}:
+        raise ValueError(f"muscle_signal must be 'activation' or 'excitation', got {muscle_signal!r}.")
     if gait_index not in {0, 1}:
         raise ValueError("gait_index must be 0 or 1 so it maps to Gait120 Step01 or Step02.")
     if motion_group not in MOTION_SETS:
@@ -56,16 +59,12 @@ def prepare_clip(
     with np.load(source, allow_pickle=True) as archive:
         prefix = f"episode_{episode}"
         qpos = np.asarray(archive[f"{prefix}_joint_positions"], dtype=float)
-        exported = np.asarray(archive[f"{prefix}_muscle_activations"], dtype=float)
         touch = np.asarray(archive[f"{prefix}_touch_observations"], dtype=float)
         traj_id = int(np.asarray(archive[f"{prefix}_traj_id"]).item())
         reference_length = int(np.asarray(archive[f"{prefix}_traj_length"]).item())
-        activation = align_activation_to_observation_timeline(
-            exported,
-            activation_sample_phase(archive),
-        )
-    if len(qpos) != len(activation) or len(qpos) != len(touch):
-        raise ValueError("Gait120 qpos, activation, and touch observations must share one frame axis.")
+        muscle_data = muscle_signal_from_archive(archive, episode, muscle_signal=muscle_signal)
+    if len(qpos) != len(muscle_data) or len(qpos) != len(touch):
+        raise ValueError("Gait120 qpos, muscle signal, and touch observations must share one frame axis.")
 
     contacts = get_feet_contacts(touch_sensors_data=touch, threshold=0.05)
     strides = extract_valid_strides_flexible(
@@ -74,14 +73,14 @@ def prepare_clip(
         expected_n=round(reference_length / 100),
     )
     indexes = complete_activation_gait_indexes(
-        activation,
+        muscle_data,
         [(int(stride.start), int(stride.end)) for stride in strides],
     )
     if gait_index >= len(indexes):
-        raise ValueError(f"Episode {episode} contains only {len(indexes)} complete activation-aligned strides.")
+        raise ValueError(f"Episode {episode} contains only {len(indexes)} complete {muscle_signal}-aligned strides.")
     start, stop = indexes[gait_index]
     qpos_clip = qpos[start:stop]
-    activation_clip = activation[start:stop]
+    muscle_clip = muscle_data[start:stop]
     if len(qpos_clip) < 2:
         raise ValueError("The selected Gait120 stride has fewer than two frames.")
 
@@ -100,10 +99,10 @@ def prepare_clip(
         SignalComparison(
             label=f"{name} | {Gait120_muscle_map[name]}",
             human=resample_profile(human_profiles[index], len(qpos_clip)),
-            policy=activation_clip[:, columns[index]],
+            policy=muscle_clip[:, columns[index]],
             color=COLORS[index % len(COLORS)],
             human_label="Gait120 human EMG",
-            policy_label="Policy activation",
+            policy_label=f"Policy {muscle_signal}",
         )
         for index, name in enumerate(selected_channels)
     )
@@ -119,7 +118,7 @@ def prepare_clip(
     )
     return RenderClip(
         qpos=qpos_clip,
-        activations=activation_clip,
+        activations=muscle_clip,
         sample_hz=100.0,
         x=x,
         x_label="gait cycle (%)",
@@ -132,7 +131,7 @@ def prepare_clip(
             elevation=camera_elevation,
         ),
         title="Gait120 neuromuscular comparison",
-        subtitle=f"S{subject:03d} | Step{gait_index + 1:02d} | phase-aligned (not shared clock time)",
+        subtitle=f"S{subject:03d} | Step{gait_index + 1:02d} | {muscle_signal} | phase-aligned (not shared clock time)",
         joint_names=tuple(joint_names_myo),
         activation_names=tuple(muscle_names_myo),
         tendon_signals=tendon_signals,
@@ -142,5 +141,6 @@ def prepare_clip(
             "subject": f"S{subject:03d}",
             "step": f"Step{gait_index + 1:02d}",
             "motion_group": motion_group,
+            "muscle_signal": muscle_signal,
         },
     )

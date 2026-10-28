@@ -43,7 +43,12 @@ class CameraConfig:
 
 @dataclass(frozen=True)
 class RenderClip:
-    """A synchronized policy motion and human/policy signal comparison."""
+    """A synchronized policy motion and human/policy signal comparison.
+
+    ``activations`` retains its historical name and carries the selected muscle
+    signal [frames, actuators] used for tendon styling. Gait120 records that
+    signal's identity in ``metadata["muscle_signal"]``.
+    """
 
     qpos: FloatArray
     activations: FloatArray

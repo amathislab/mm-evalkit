@@ -5,6 +5,8 @@ from __future__ import annotations
 import argparse
 from collections.abc import Sequence
 
+from mm_evalkit.activation import DEFAULT_MUSCLE_SIGNAL
+
 from ...cli_options import (
     add_dataset_dir,
     add_motion_group,
@@ -75,9 +77,10 @@ def build_parser(*, fixed_dataset: str | None = None) -> argparse.ArgumentParser
         )
     parser.add_argument(
         "--muscle_signal",
+        "--muscle-signal",
         choices=["activation", "excitation"],
-        default="activation",
-        help="Policy muscle signal compared with EMG: exported activation, or excitation from muscle commands.",
+        default=DEFAULT_MUSCLE_SIGNAL,
+        help="Policy muscle signal compared with EMG (default: excitation from muscle commands).",
     )
     parser.add_argument(
         "--kinetics_window",

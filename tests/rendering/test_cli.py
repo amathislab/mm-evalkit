@@ -46,3 +46,16 @@ def test_render_cli_accepts_historical_kebab_case_aliases(arguments, attribute, 
     args = build_parser().parse_args(arguments)
 
     assert getattr(args, attribute) == expected
+
+
+@pytest.mark.parametrize("signal", [None, "activation"])
+def test_gait_render_cli_forwards_muscle_signal(monkeypatch, signal):
+    from mm_evalkit.rendering import cli
+
+    received = {}
+    monkeypatch.setattr(cli, "render_video", lambda **options: received.update(options))
+    arguments = ["gait120", "--trajectory_path", "rollout.npz", "--episode", "0", "--output", "out.mp4"]
+    if signal is not None:
+        arguments.extend(["--muscle_signal", signal])
+    assert cli.main(arguments) == 0
+    assert received["muscle_signal"] == (signal or "excitation")
