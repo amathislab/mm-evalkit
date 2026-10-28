@@ -31,6 +31,9 @@ class FullBodyAnalysis:
         human_subject_policy: str = "drop-and-report",
         kinetics_reference_dir: str | Path | None = None,
         *,
+        muscle_signal: str = "activation",
+        kinetics_window: str = "left_heel_strike",
+        extended_channels: bool = False,
         motion_list_Gait120: str | None = None,
     ) -> None:
         """Validate every configured input, then load rollout and human data.
@@ -52,6 +55,9 @@ class FullBodyAnalysis:
             kinematics_source=kinematics_source,
             human_subject_policy=human_subject_policy,
             kinetics_reference_dir=kinetics_reference_dir,
+            muscle_signal=muscle_signal,
+            kinetics_window=kinetics_window,
+            extended_channels=extended_channels,
         )
         self.state: GaitAnalysis = load_gait_analysis(self.config)
 

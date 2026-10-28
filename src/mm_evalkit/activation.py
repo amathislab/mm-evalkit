@@ -57,6 +57,21 @@ def align_activation_to_observation_timeline(
     return aligned
 
 
+def excitation_from_commands(commands: np.ndarray) -> np.ndarray:
+    """Return muscle excitation on the pre-step state timeline.
+
+    ``muscle_commands`` is the policy action after clipping to [-1, 1]. MuJoCo
+    muscles are ``ctrllimited`` to [0, 1], so the excitation that drives
+    activation dynamics is that command clipped to [0, 1]. Row ``i`` is the
+    control held over the step that starts at state ``i``, so it already shares
+    the qpos timeline whatever ``muscle_command_sample_phase`` says.
+    """
+    values = np.asarray(commands, dtype=float)
+    if values.ndim != 2:
+        raise ValueError(f"Muscle commands must have shape (frames, muscles); got {values.shape}.")
+    return np.clip(values, 0.0, 1.0)
+
+
 def complete_activation_gait_indexes(
     activation: np.ndarray,
     gait_indexes: list[tuple[int, int]],

@@ -73,6 +73,24 @@ def build_parser(*, fixed_dataset: str | None = None) -> argparse.ArgumentParser
             kinematics_source="opensim-ik",
             kinetics_reference_dir=None,
         )
+    parser.add_argument(
+        "--muscle_signal",
+        choices=["activation", "excitation"],
+        default="activation",
+        help="Policy muscle signal compared with EMG: exported activation, or excitation from muscle commands.",
+    )
+    parser.add_argument(
+        "--kinetics_window",
+        choices=["left_heel_strike", "right_stride"],
+        default="left_heel_strike",
+        help="Kinetics cycle: fixed 1 s from left heel strike, or the force-plate right stride.",
+    )
+    parser.add_argument(
+        "--extended_channels",
+        action="store_true",
+        help="Gait120 only: also compare subtalar and MTP angles, and hip adduction/rotation, subtalar and MTP "
+        "moments.",
+    )
     return parser
 
 
@@ -90,6 +108,9 @@ def _run(argv: Sequence[str] | None, *, dataset_name: str | None) -> int:
         kinematics_source=args.kinematics_source,
         human_subject_policy=args.human_subject_policy,
         kinetics_reference_dir=args.kinetics_reference_dir,
+        muscle_signal=args.muscle_signal,
+        kinetics_window=args.kinetics_window,
+        extended_channels=args.extended_channels,
     )
     analysis.run_gait_position_analyses()
     return 0

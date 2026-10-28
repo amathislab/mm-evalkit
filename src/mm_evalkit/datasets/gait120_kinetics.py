@@ -5,8 +5,12 @@ dynamics, and model contact forces with corrected Gait120 force-plate vertical
 ground-reaction forces. The reference files contain full, time-indexed trials
 rather than the already phase-normalized Step01/Step02 profiles used by
 :mod:`mm_evalkit.datasets.gait120`. This module owns that dataset schema and
-converts every retained left-heel-strike window to the common 100-point gait
-grid.
+converts every retained gait window to the common 100-point gait grid.
+
+Two windows are supported. ``left_heel_strike`` is a fixed 1.00 s window from
+each left force-plate contact, the contract shared with the policy-summary
+exporters. ``right_stride`` is one right heel strike to the next, the same
+convention as the joint-angle and EMG cycles.
 """
 
 from __future__ import annotations
@@ -14,7 +18,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import numpy as np
 from numpy.typing import NDArray
@@ -29,9 +33,24 @@ TORQUE_JOINTS = (
     "ankle_angle_r",
     "ankle_angle_l",
 )
+# Every other lower-limb moment the references carry, for analyses that compare
+# more than the sagittal hip, knee and ankle.
+EXTENDED_TORQUE_JOINTS = (
+    *TORQUE_JOINTS,
+    "hip_adduction_r",
+    "hip_adduction_l",
+    "hip_rotation_r",
+    "hip_rotation_l",
+    "subtalar_angle_r",
+    "subtalar_angle_l",
+    "mtp_angle_r",
+    "mtp_angle_l",
+)
 GRF_CHANNELS = ("left", "right")
 TORQUE_UNIT = "Nm/kg"
 GRF_UNIT = "BW"
+KineticsWindow = Literal["left_heel_strike", "right_stride"]
+KINETICS_WINDOWS = ("left_heel_strike", "right_stride")
 
 _SUBJECT = re.compile(r"^S(?P<subject>\d{3})$")
 _TRIAL = re.compile(r"^Trial(?P<trial>\d{2})$")
@@ -61,6 +80,8 @@ class Gait120KineticsTrial:
     Raw signal shapes are ``(n_frames, n_channels)``. Cycle shapes are
     ``(n_cycles, n_channels, 100)``. Moments are normalized to ``Nm/kg`` and
     vertical GRF to multiples of body weight before a gait window is selected.
+    Torque validity is per frame for legacy references or per frame and channel
+    when the reference supplies column validity.
     """
 
     path: Path
@@ -192,6 +213,32 @@ def left_heel_strike_windows(
     return tuple((start, start + window_frames) for start in starts if start + window_frames <= len(left))
 
 
+def right_stride_windows(
+    vertical_grf_right: FloatArray,
+    *,
+    contact_threshold: float = 0.05,
+    max_stride_mismatch: float = 0.15,
+) -> tuple[tuple[int, int], ...]:
+    """Return the force-plate right stride: right heel strike to trial end.
+
+    A Gait120 ``Step01_Step02`` trial spans two right strides, with right heel
+    strikes at frame 0, mid-trial and the last frame. Only the mid-trial right
+    stance lands on a force plate, so its onset opens the stride and the trial
+    end closes it. The two strides must agree in length within
+    ``max_stride_mismatch``; a trial that breaks that structure has no window.
+    """
+    if not np.isfinite(contact_threshold) or contact_threshold < 0:
+        raise ValueError(f"contact_threshold must be finite and non-negative, got {contact_threshold}.")
+    right = np.asarray(vertical_grf_right, dtype=float) > contact_threshold
+    onsets = [index for index in range(1, len(right)) if not right[index - 1] and right[index]]
+    if len(onsets) != 1:
+        return ()
+    start, end = onsets[0], len(right)
+    if abs((end - start) - start) > max_stride_mismatch * start:
+        return ()
+    return ((start, end),)
+
+
 def phase_normalize_window(
     values: FloatArray,
     valid: NDArray[np.bool_],
@@ -201,7 +248,8 @@ def phase_normalize_window(
 ) -> FloatArray:
     """Interpolate one time-preserving window to ``(channels, n_samples)``.
 
-    Invalid rows retain their original phase coordinates; removing them does
+    Validity may be per row or per channel. Invalid samples retain their
+    original phase coordinates; removing them does
     not compress the remaining samples in time. A channel with fewer than two
     finite valid points remains undefined.
     """
@@ -212,7 +260,8 @@ def phase_normalize_window(
     target = np.linspace(0.0, 1.0, n_samples)
     output = np.full((segment.shape[1], n_samples), np.nan, dtype=float)
     for channel in range(segment.shape[1]):
-        finite = valid_segment & np.isfinite(segment[:, channel])
+        channel_valid = valid_segment if valid_segment.ndim == 1 else valid_segment[:, channel]
+        finite = channel_valid & np.isfinite(segment[:, channel])
         if np.count_nonzero(finite) < 2:
             continue
         first = float(source[finite][0])
@@ -228,8 +277,12 @@ def load_gait120_kinetics_trial(
     n_samples: int = 100,
     window_frames: int = 100,
     contact_threshold: float = 0.05,
+    window: KineticsWindow = "left_heel_strike",
+    torque_joints: tuple[str, ...] = TORQUE_JOINTS,
 ) -> Gait120KineticsTrial:
     """Load one ``S###_Trial##_Step01_Step02.npz`` kinetics reference."""
+    if window not in KINETICS_WINDOWS:
+        raise ValueError(f"window must be one of {', '.join(KINETICS_WINDOWS)}, got {window!r}.")
     path = Path(npz_path).expanduser().resolve()
     if not path.is_file():
         raise FileNotFoundError(f"Gait120 kinetics reference does not exist: {path}")
@@ -268,7 +321,7 @@ def load_gait120_kinetics_trial(
 
         torque_indices = _required_indices(
             torque_columns,
-            tuple(f"{name}_moment" for name in TORQUE_JOINTS),
+            tuple(f"{name}_moment" for name in torque_joints),
             signal="joint torque",
             path=path,
         )
@@ -287,6 +340,14 @@ def load_gait120_kinetics_trial(
             path,
         )
         torque_valid = _valid_rows(data, "joint_torque_valid", n_frames, path)
+        if "joint_torque_column_valid" in data:
+            column_valid = np.asarray(data["joint_torque_column_valid"])
+            if column_valid.dtype.kind != "b" or column_valid.shape != torque_raw.shape:
+                raise ValueError(
+                    f"Gait120 kinetics joint_torque_column_valid must be a boolean matrix "
+                    f"of shape {torque_raw.shape} in {path}."
+                )
+            torque_valid = column_valid[:, torque_indices]
         grf_valid = _valid_rows(data, "computed_grf_valid", n_frames, path)
 
         if "time_sec" in data:
@@ -296,19 +357,22 @@ def load_gait120_kinetics_trial(
         else:
             time = np.arange(n_frames, dtype=float)
 
-    windows = left_heel_strike_windows(
-        grf[:, 0],
-        window_frames=window_frames,
-        contact_threshold=contact_threshold,
-    )
+    if window == "right_stride":
+        windows = right_stride_windows(grf[:, 1], contact_threshold=contact_threshold)
+    else:
+        windows = left_heel_strike_windows(
+            grf[:, 0],
+            window_frames=window_frames,
+            contact_threshold=contact_threshold,
+        )
     if not windows:
-        raise ValueError(f"Gait120 kinetics reference contains no complete left-heel-strike window: {path}")
+        raise ValueError(f"Gait120 kinetics reference contains no complete {window} window: {path}")
     torque_cycles = np.stack(
         [phase_normalize_window(torque, torque_valid, window, n_samples=n_samples) for window in windows]
     )
     grf_cycles = np.stack([phase_normalize_window(grf, grf_valid, window, n_samples=n_samples) for window in windows])
     missing_torque = [
-        name for index, name in enumerate(TORQUE_JOINTS) if not np.isfinite(torque_cycles[:, index]).any()
+        name for index, name in enumerate(torque_joints) if not np.isfinite(torque_cycles[:, index]).any()
     ]
     missing_grf = [name for index, name in enumerate(GRF_CHANNELS) if not np.isfinite(grf_cycles[:, index]).any()]
     if missing_torque or missing_grf:
@@ -329,4 +393,5 @@ def load_gait120_kinetics_trial(
         gait_windows=windows,
         torque_cycles=torque_cycles,
         grf_cycles=grf_cycles,
+        torque_names=tuple(torque_joints),
     )

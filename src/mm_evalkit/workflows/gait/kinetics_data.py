@@ -24,6 +24,7 @@ from mm_evalkit.datasets.gait120_kinetics import (
     TORQUE_JOINTS,
     TORQUE_UNIT,
     Gait120KineticsTrial,
+    KineticsWindow,
     load_gait120_kinetics_trial,
 )
 from mm_evalkit.policies import PolicySpec
@@ -40,6 +41,13 @@ _SUMMARY_GRF_UNITS = {"body_weight_normalized", "body_weight_units", "bw"}
 _RAW_TORQUE_UNITS = {"nm", "n_m"}
 _RAW_FORCE_UNITS = {"n", "newtons"}
 _GRAVITY_MPS2 = 9.80665
+# Rollouts end a few frames before their reference trial does, so a stride
+# that runs to the trial end is kept when this much of it, from heel strike
+# on, is covered. The uncovered tail stays NaN.
+MIN_STRIDE_COVERAGE = 0.9
+# The references mirror left hip adduction and rotation, as Gait120 IK does for
+# the left hip angles, so the matching policy moments are mirrored to compare.
+_MIRRORED_LEFT_MOMENTS = frozenset({"hip_adduction_l", "hip_rotation_l"})
 
 
 @dataclass(frozen=True, slots=True)
@@ -146,7 +154,25 @@ def _closest_reference_indices(timesteps: FloatArray, reference_time: FloatArray
     return indices.astype(int)
 
 
+def _window_samples(
+    frame_indices: IntArray, window: tuple[int, int], kinetics_window: KineticsWindow
+) -> np.ndarray | None:
+    """Rows inside ``window``, or None when the policy does not cover enough of it.
+
+    A fixed left-heel-strike window must be covered frame for frame. A right
+    stride must be covered contiguously from its heel strike for at least
+    ``MIN_STRIDE_COVERAGE`` of its length.
+    """
+    start, end = window
+    in_window = (frame_indices >= start) & (frame_indices < end)
+    covered = frame_indices[in_window]
+    contiguous = np.array_equal(covered, np.arange(start, start + len(covered)))
+    required = end - start if kinetics_window == "left_heel_strike" else int(np.ceil(MIN_STRIDE_COVERAGE * (end - start)))
+    return in_window if contiguous and len(covered) >= required else None
+
+
 def _phase_normalize_samples(values: FloatArray, frame_indices: IntArray, window: tuple[int, int]) -> FloatArray:
+    """Interpolate onto the 100-point grid without extrapolating past coverage."""
     start, end = window
     source = (np.asarray(frame_indices, dtype=float) - start) / (end - start - 1)
     target = np.linspace(0.0, 1.0, 100)
@@ -155,23 +181,24 @@ def _phase_normalize_samples(values: FloatArray, frame_indices: IntArray, window
         finite = np.isfinite(values[:, channel])
         if np.count_nonzero(finite) < 2:
             continue
-        output[channel] = np.interp(target, source[finite], values[finite, channel])
+        inside = (target >= source[finite][0] - 1e-9) & (target <= source[finite][-1] + 1e-9)
+        output[channel, inside] = np.interp(target[inside], source[finite], values[finite, channel])
     return output
 
 
-def _swap_torque_sides(values: FloatArray) -> FloatArray:
-    indexes = {name: index for index, name in enumerate(TORQUE_JOINTS)}
+def _swap_torque_sides(values: FloatArray, torque_joints: tuple[str, ...]) -> FloatArray:
+    indexes = {name: index for index, name in enumerate(torque_joints)}
     source = []
-    for name in TORQUE_JOINTS:
+    for name in torque_joints:
         opposite = f"{name[:-2]}_{'l' if name.endswith('_r') else 'r'}"
         source.append(indexes[opposite])
     return values[:, source]
 
 
-def _empty_cycles() -> KineticsCycles:
+def _empty_cycles(torque_joints: tuple[str, ...]) -> KineticsCycles:
     return KineticsCycles(
-        torque=np.empty((0, len(TORQUE_JOINTS), 100)),
-        torque_ref=np.empty((0, len(TORQUE_JOINTS), 100)),
+        torque=np.empty((0, len(torque_joints), 100)),
+        torque_ref=np.empty((0, len(torque_joints), 100)),
         grf=np.empty((0, len(GRF_CHANNELS), 100)),
         grf_ref=np.empty((0, len(GRF_CHANNELS), 100)),
         subject_ids=np.empty(0, dtype=int),
@@ -184,6 +211,8 @@ def _load_summary_policy_kinetics(
     policy: PolicySpec,
     *,
     reference_dir: Path | None,
+    kinetics_window: KineticsWindow = "left_heel_strike",
+    torque_joints: tuple[str, ...] = TORQUE_JOINTS,
 ) -> LoadedPolicyKinetics:
     """Validate and extract one policy's MuJoCo torque/GRF summary."""
     if policy.kinetics_summary_path is None:
@@ -207,12 +236,12 @@ def _load_summary_policy_kinetics(
         if n_episodes < 1:
             raise ValueError(f"Policy kinetics n_episodes must be positive in {path}.")
         joint_names = _strings(data, "joint_names", path)
-        missing_joints = [name for name in TORQUE_JOINTS if name not in joint_names]
+        missing_joints = [name for name in torque_joints if name not in joint_names]
         if missing_joints:
             raise ValueError(
                 f"Policy kinetics summary is missing required joint(s) in {path}: {', '.join(missing_joints)}."
             )
-        joint_indexes = [joint_names.index(name) for name in TORQUE_JOINTS]
+        joint_indexes = [joint_names.index(name) for name in torque_joints]
         grf_columns = _strings(data, "grf_columns", path)
         required_grf = ("group_2_3_y", "group_0_1_y")
         missing_grf = [name for name in required_grf if name not in grf_columns]
@@ -233,7 +262,9 @@ def _load_summary_policy_kinetics(
         for episode in range(n_episodes):
             prefix = f"episode_{episode}"
             reference_name, resolved_reference = _reference_path(data, episode, path, reference_dir)
-            reference = load_gait120_kinetics_trial(resolved_reference)
+            reference = load_gait120_kinetics_trial(
+                resolved_reference, window=kinetics_window, torque_joints=torque_joints
+            )
             key = (reference.subject, reference.trial)
             existing = references.get(key)
             if existing is not None and existing.path != reference.path:
@@ -250,20 +281,21 @@ def _load_summary_policy_kinetics(
             ]
             policy_grf = _episode_matrix(data, f"{prefix}_grf", n_rows, len(grf_columns), path)[:, grf_indexes]
             if not knee_flipped:
-                for index, name in enumerate(TORQUE_JOINTS):
+                for index, name in enumerate(torque_joints):
                     if name.startswith("knee_angle_"):
                         policy_torque[:, index] *= -1.0
             if policy.kinetics_swap_left_right:
-                policy_torque = _swap_torque_sides(policy_torque)
+                policy_torque = _swap_torque_sides(policy_torque, torque_joints)
                 policy_grf = policy_grf[:, ::-1]
+            # After any swap, so a moment is mirrored by the side it now stands for.
+            for index, name in enumerate(torque_joints):
+                if name in _MIRRORED_LEFT_MOMENTS:
+                    policy_torque[:, index] *= -1.0
             indices = _closest_reference_indices(timesteps, reference.time, path, episode)
 
             for gait_position, window in enumerate(reference.gait_windows):
-                start, end = window
-                in_window = (indices >= start) & (indices < end)
-                covered = indices[in_window]
-                complete = len(covered) == end - start and np.array_equal(covered, np.arange(start, end))
-                if not complete:
+                in_window = _window_samples(indices, window, kinetics_window)
+                if in_window is None:
                     omissions.append(
                         KineticsOmission(
                             policy_id=policy.id,
@@ -274,6 +306,7 @@ def _load_summary_policy_kinetics(
                         )
                     )
                     continue
+                covered = indices[in_window]
                 normalized_torque = _phase_normalize_samples(policy_torque[in_window], covered, window)
                 normalized_grf = _phase_normalize_samples(policy_grf[in_window], covered, window)
                 finite_torque_channels = np.isfinite(normalized_torque).any(axis=1)
@@ -302,7 +335,7 @@ def _load_summary_policy_kinetics(
             gait_positions=np.asarray(gait_positions, dtype=int),
         )
         if torque_cycles
-        else _empty_cycles()
+        else _empty_cycles(torque_joints)
     )
     return LoadedPolicyKinetics(policy.id, cycles, tuple(omissions), references)
 
@@ -342,6 +375,8 @@ def _load_rollout_policy_kinetics(
     *,
     reference_dir: Path,
     motion_list: tuple[str, ...],
+    kinetics_window: KineticsWindow = "left_heel_strike",
+    torque_joints: tuple[str, ...] = TORQUE_JOINTS,
 ) -> LoadedPolicyKinetics:
     path = policy.trajectory_path.expanduser().resolve()
     torque_cycles: list[FloatArray] = []
@@ -364,10 +399,10 @@ def _load_rollout_policy_kinetics(
         joint_units = _string_values(data, "generalized_actuator_force_units", path)
         if len(joint_names) != len(joint_units):
             raise ValueError(f"Policy kinetics joint names and units differ in length in {path}.")
-        missing_joints = [name for name in TORQUE_JOINTS if name not in joint_names]
+        missing_joints = [name for name in torque_joints if name not in joint_names]
         if missing_joints:
             raise ValueError(f"Policy kinetics rollout is missing required joint(s) in {path}: {missing_joints}.")
-        joint_indexes = [joint_names.index(name) for name in TORQUE_JOINTS]
+        joint_indexes = [joint_names.index(name) for name in torque_joints]
         invalid_joint_units = [
             joint_units[index] for index in joint_indexes if joint_units[index].casefold() not in _RAW_TORQUE_UNITS
         ]
@@ -408,7 +443,9 @@ def _load_rollout_policy_kinetics(
                     )
                 )
                 continue
-            reference = load_gait120_kinetics_trial(reference_path)
+            reference = load_gait120_kinetics_trial(
+                reference_path, window=kinetics_window, torque_joints=torque_joints
+            )
             key = (reference.subject, reference.trial)
             existing = references.get(key)
             if existing is not None and existing.path != reference.path:
@@ -436,7 +473,7 @@ def _load_rollout_policy_kinetics(
                 )
 
             policy_torque = raw_torque[:, joint_indexes] / model_mass_kg
-            for index, name in enumerate(TORQUE_JOINTS):
+            for index, name in enumerate(torque_joints):
                 if name.startswith("knee_angle_"):
                     policy_torque[:, index] *= -1.0
             selected_sensors = raw_sensors[:, sensor_indexes]
@@ -452,15 +489,16 @@ def _load_rollout_policy_kinetics(
                     / model_body_weight_n
                 )
             if policy.kinetics_swap_left_right:
-                policy_torque = _swap_torque_sides(policy_torque)
+                policy_torque = _swap_torque_sides(policy_torque, torque_joints)
                 policy_grf = policy_grf[:, ::-1]
+            # After any swap, so a moment is mirrored by the side it now stands for.
+            for index, name in enumerate(torque_joints):
+                if name in _MIRRORED_LEFT_MOMENTS:
+                    policy_torque[:, index] *= -1.0
 
             for gait_position, window in enumerate(reference.gait_windows):
-                start, end = window
-                in_window = (frame_indices >= start) & (frame_indices < end)
-                covered = frame_indices[in_window]
-                complete = len(covered) == end - start and np.array_equal(covered, np.arange(start, end))
-                if not complete:
+                in_window = _window_samples(frame_indices, window, kinetics_window)
+                if in_window is None:
                     omissions.append(
                         KineticsOmission(
                             policy_id=policy.id,
@@ -471,6 +509,7 @@ def _load_rollout_policy_kinetics(
                         )
                     )
                     continue
+                covered = frame_indices[in_window]
                 normalized_torque = _phase_normalize_samples(policy_torque[in_window], covered, window)
                 normalized_grf = _phase_normalize_samples(policy_grf[in_window], covered, window)
                 if not np.all(np.isfinite(normalized_torque).any(axis=1)) or not np.all(
@@ -499,7 +538,7 @@ def _load_rollout_policy_kinetics(
             gait_positions=np.asarray(gait_positions, dtype=int),
         )
         if torque_cycles
-        else _empty_cycles()
+        else _empty_cycles(torque_joints)
     )
     return LoadedPolicyKinetics(policy.id, cycles, tuple(omissions), references)
 
@@ -509,15 +548,25 @@ def load_policy_kinetics(
     *,
     reference_dir: Path | None,
     motion_list: tuple[str, ...] | None = None,
+    kinetics_window: KineticsWindow = "left_heel_strike",
+    torque_joints: tuple[str, ...] = TORQUE_JOINTS,
 ) -> LoadedPolicyKinetics:
     """Load legacy summary kinetics or the generic rollout's embedded signals."""
     if policy.kinetics_summary_path is not None:
-        return _load_summary_policy_kinetics(policy, reference_dir=reference_dir)
+        return _load_summary_policy_kinetics(
+            policy, reference_dir=reference_dir, kinetics_window=kinetics_window, torque_joints=torque_joints
+        )
     if reference_dir is None or motion_list is None:
         raise ValueError(
             f"Policy {policy.id!r} embedded kinetics requires kinetics_reference_dir and an explicit motion group."
         )
-    return _load_rollout_policy_kinetics(policy, reference_dir=reference_dir, motion_list=motion_list)
+    return _load_rollout_policy_kinetics(
+        policy,
+        reference_dir=reference_dir,
+        motion_list=motion_list,
+        kinetics_window=kinetics_window,
+        torque_joints=torque_joints,
+    )
 
 
 def _reference_cycles(references: dict[tuple[int, int], Gait120KineticsTrial]) -> KineticsCycles:
@@ -552,6 +601,8 @@ def load_kinetics_cohort(
     *,
     reference_dir: Path | None,
     motion_list: tuple[str, ...] | None = None,
+    kinetics_window: KineticsWindow = "left_heel_strike",
+    torque_joints: tuple[str, ...] = TORQUE_JOINTS,
 ) -> KineticsCohort | None:
     """Load the optional all-policy kinetics layer and require one reference sample."""
     summary_configured = [run.policy.kinetics_summary_path is not None for run in runs]
@@ -567,7 +618,16 @@ def load_kinetics_cohort(
     if not all(configured):
         raise ValueError("Kinetics must be configured for every compared policy.")
 
-    loaded = [load_policy_kinetics(run.policy, reference_dir=reference_dir, motion_list=motion_list) for run in runs]
+    loaded = [
+        load_policy_kinetics(
+            run.policy,
+            reference_dir=reference_dir,
+            motion_list=motion_list,
+            kinetics_window=kinetics_window,
+            torque_joints=torque_joints,
+        )
+        for run in runs
+    ]
     non_trial_five = sorted(identity for result in loaded for identity in result.references if identity[1] != 5)
     if non_trial_five:
         raise ValueError(
@@ -607,7 +667,7 @@ def load_kinetics_cohort(
     references = loaded[0].references
     paths = tuple(references[key].path for key in sorted(references))
     return KineticsCohort(
-        torque_names=TORQUE_JOINTS,
+        torque_names=tuple(torque_joints),
         grf_names=GRF_CHANNELS,
         torque_unit=TORQUE_UNIT,
         grf_unit=GRF_UNIT,

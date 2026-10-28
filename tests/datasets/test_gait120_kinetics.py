@@ -12,6 +12,7 @@ from mm_evalkit.datasets.gait120_kinetics import (
     TORQUE_JOINTS,
     left_heel_strike_windows,
     load_gait120_kinetics_trial,
+    right_stride_windows,
 )
 
 
@@ -114,6 +115,36 @@ def test_contact_windows_reject_invalid_parameters_and_incomplete_tail() -> None
         left_heel_strike_windows(grf, window_frames=1)
 
 
+def test_column_validity_preserves_one_leg_when_other_leg_is_invalid(tmp_path: Path) -> None:
+    path = tmp_path / "S012" / "S012_Trial05_Step01_Step02.npz"
+    _write_reference(path)
+    with np.load(path) as source:
+        values = {key: source[key] for key in source.files}
+    valid = np.ones_like(values["joint_torque"], dtype=bool)
+    valid[:20, 1] = False
+    values["joint_torque_column_valid"] = valid
+    values["joint_torque_valid"] = valid.all(axis=1)
+    np.savez(path, **values)
+
+    trial = load_gait120_kinetics_trial(path)
+
+    np.testing.assert_allclose(trial.torque_cycles[0, 0], np.arange(100.0))
+    assert np.isnan(trial.torque_cycles[0, 1, :20]).all()
+    np.testing.assert_allclose(trial.torque_cycles[0, 1, 20:], np.arange(21.0, 101.0))
+
+
+def test_malformed_column_validity_is_rejected(tmp_path: Path) -> None:
+    path = tmp_path / "S012" / "S012_Trial05_Step01_Step02.npz"
+    _write_reference(path)
+    with np.load(path) as source:
+        values = {key: source[key] for key in source.files}
+    values["joint_torque_column_valid"] = np.ones((220, 1), dtype=bool)
+    np.savez(path, **values)
+
+    with pytest.raises(ValueError, match="joint_torque_column_valid"):
+        load_gait120_kinetics_trial(path)
+
+
 def test_present_malformed_reference_is_not_silently_skipped(tmp_path: Path) -> None:
     path = tmp_path / "S012" / "S012_Trial05_Step01_Step02.npz"
     _write_reference(path)
@@ -123,3 +154,34 @@ def test_present_malformed_reference_is_not_silently_skipped(tmp_path: Path) -> 
 
     with pytest.raises(ValueError, match="joint_torque_units"):
         load_gait120_kinetics_trial(path)
+
+
+def test_right_stride_runs_from_plate_heel_strike_to_trial_end() -> None:
+    """Step01_Step02 trials hold two right strides; the plate stance opens the second."""
+    right = np.zeros(200)
+    right[100:160] = 1.0
+    assert right_stride_windows(right) == ((100, 200),)
+    # A trial whose halves differ by more than 15 % breaks the two-stride structure.
+    assert right_stride_windows(right[:130]) == ()
+    # Two plate contacts, or contact from the first frame, are not one stride.
+    right[20:40] = 1.0
+    assert right_stride_windows(right) == ()
+    assert right_stride_windows(np.ones(200)) == ()
+
+
+def test_reader_selects_right_stride_window(tmp_path: Path) -> None:
+    path = tmp_path / "S012" / "S012_Trial05_Step01_Step02.npz"
+    _write_reference(path)
+    with np.load(path) as archive:
+        values = dict(archive)
+    right = np.zeros(220)
+    right[110:170] = 1.0
+    values["computed_grf"] = np.column_stack([values["computed_grf"][:, 0], right])
+    np.savez(path, **values)
+
+    trial = load_gait120_kinetics_trial(path, window="right_stride")
+
+    assert trial.gait_windows == ((110, 220),)
+    assert trial.torque_cycles.shape == (1, len(TORQUE_JOINTS), 100)
+    with pytest.raises(ValueError, match="window must be one of"):
+        load_gait120_kinetics_trial(path, window="stride")

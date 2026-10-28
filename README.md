@@ -211,6 +211,68 @@ line styles come from the policy YAML, so restyling means editing that file
 rather than the script. `figures/policies.example.yaml` documents the palette
 choice, including why the green entry also carries a dashed line style.
 
+### Anatomical legend
+
+Render MyoFullBody's right-leg bone meshes and muscle paths with Blender:
+
+```bash
+python figures/render_gait120_anatomy.py \
+  --blender /path/to/blender \
+  --output_dir assets/gait120_anatomy
+```
+
+Add `--anatomy_dir assets/gait120_anatomy` to the comparison command above to
+include anterior and posterior views highlighting VL, BF long head, TA and GM,
+plus a sagittal view marking hip, knee and ankle rotation. Muscle-path thickness
+and rotation arcs are illustrative. The renderer also saves an editable
+`gait120_anatomy.blend` scene. An existing analysis cache can be reused with
+`--cache /path/to/gait120_comparison_cache.pkl` when only the layout changes.
+
+For a lateral gait sequence aligned to the waveform axes, render poses from
+one stride of a rollout episode. Run the comparison command once first: its
+analysis cache supplies the human averages drawn on the poses.
+
+```bash
+python figures/render_gait120_sequence.py \
+  --blender /path/to/blender \
+  --rollout /path/to/episodes.npz \
+  --episode 1 \
+  --analysis_cache results/figure/gait120_comparison_cache.pkl \
+  --kinetics_reference_dir /path/to/gait120-kinetics \
+  --output_dir assets/gait120_sequence
+```
+
+Use `--sequence_dir assets/gait120_sequence` on the comparison command for the
+wide layout: three columns for angles, kinetics and muscle activity, plus a
+fourth column of agreement metrics. Each waveform column starts with a pose
+strip whose hips sit exactly on the phase ticks, and a stance/swing bar. The
+angle and muscle columns show one right stride; the kinetics column shows its
+own window (below). The poses are one policy rollout, but the overlays are
+Gait120 subject averages: kinetics poses carry the mean vertical GRF as an
+arrow, muscle paths are coloured by mean EMG scaled to each muscle's peak, and
+stance bars mark where mean vertical GRF exceeds 0.05 BW. The same render also
+feeds `gait120_overlays.*`, which sets each policy's mean GRF and muscle signal
+against the Gait120 mean on the same poses. Poses illustrate one recorded
+policy rollout, rather than a population mean. Root translation is removed, and
+highlighted muscle paths are projected onto the lateral plane so that medial
+paths remain visible.
+
+The comparison figure draws policy muscle **excitation** by default:
+`clip(muscle_commands, 0, 1)`, the control MuJoCo integrates into activation.
+Pass `--muscle_signal activation` for the exported `muscle_activations`. The
+muscle Pearson r follows the same choice, and a cached analysis is refused if
+it was built with the other signal. The analysis CLI takes the same
+`--muscle_signal` flag and defaults to activation.
+
+Moments and vertical GRF use the fixed 1.00 s window from left heel strike by
+default, which every rollout covers completely; it sits about half a cycle out
+of phase with angles and EMG, so column B is labelled in seconds.
+`--kinetics_window right_stride` uses the force-plate right stride instead
+(each Gait120 `Step01_Step02` trial spans two right strides, and only the
+second right stance lands on a plate). That shares the other columns' phase,
+but rollouts stop a few frames before their trial ends, so a stride covered for
+at least 90 % from heel strike is kept with its last ~7 % undefined.
+
 ### Aligning a rollout first
 
 Compared rollouts must share one ordered motion group. Some exports carry an

@@ -17,6 +17,15 @@ common_joint_names = [
     "ankle_angle_l",
 ]
 
+# Gait120 also records subtalar and MTP angles, compared under extended_channels.
+gait120_extended_joint_names = [
+    *common_joint_names,
+    "subtalar_angle_r",
+    "mtp_angle_r",
+    "subtalar_angle_l",
+    "mtp_angle_l",
+]
+
 joint_names_myo = [
     "root",
     "flex_extension",

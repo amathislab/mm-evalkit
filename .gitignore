@@ -6,3 +6,9 @@
 **/__pycache__/
 *.py[cod]
 *.egg-info/
+trajectory_data/*
+results/*
+explorations/
+configs/*
+assets/*
+notebooks/

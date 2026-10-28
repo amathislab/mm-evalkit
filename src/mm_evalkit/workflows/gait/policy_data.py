@@ -10,6 +10,7 @@ from mm_evalkit.activation import (
     activation_sample_phase,
     align_activation_to_observation_timeline,
     complete_activation_gait_indexes,
+    excitation_from_commands,
 )
 from mm_evalkit.policies import PolicySpec
 from mm_evalkit.workflows.gait.channels import joint_names_myo, muscle_names_myo
@@ -34,6 +35,17 @@ def _episode_successful(policy_traj, episode_idx):
     eps_length = policy_traj[f"episode_{episode_idx}_joint_positions"].shape[0]
     ref_length = policy_traj[f"episode_{episode_idx}_traj_length"]
     return eps_length >= ref_length - 1
+
+
+def _require_muscle_commands(policy_traj, n_episodes, source):
+    """Excitation analyses need every episode's commands, shaped like activation."""
+    for episode in range(n_episodes):
+        key = f"episode_{episode}_muscle_commands"
+        if key not in policy_traj:
+            raise ValueError(f"{source} has no {key}; muscle_signal='excitation' needs exported muscle commands.")
+        expected = policy_traj[f"episode_{episode}_muscle_activations"].shape
+        if policy_traj[key].shape != expected:
+            raise ValueError(f"{source} {key} has shape {policy_traj[key].shape}; expected {expected}.")
 
 
 def _as_int(value):
@@ -75,22 +87,27 @@ def extract_episode_gaits(
     expected_n=None,
     *,
     activation_phase=None,
+    muscle_signal="activation",
 ):
     """Extracting gait cycles from a single episode trajectory.
 
     ``expected_n`` is the number of gait cycles the reference clip should contain
     (~1 per 100 timesteps); it lets the flexible extractor keep the most canonical
-    cycles when a rollout over-segments.
+    cycles when a rollout over-segments. ``muscle_signal`` picks exported
+    activation or the excitation decoded from ``muscle_commands``.
     """
 
     touch = policy_traj[f"episode_{episode}_touch_observations"]
     joint_data_myo = policy_traj[f"episode_{episode}_joint_positions"] * 180 / math.pi
     joint_data_myo_ref = policy_traj[f"episode_{episode}_traj_qpos"] * 180 / math.pi
-    phase = activation_sample_phase(policy_traj) if activation_phase is None else activation_phase
-    muscle_data_myo = align_activation_to_observation_timeline(
-        policy_traj[f"episode_{episode}_muscle_activations"],
-        phase,
-    )
+    if muscle_signal == "excitation":
+        muscle_data_myo = excitation_from_commands(policy_traj[f"episode_{episode}_muscle_commands"])
+    else:
+        phase = activation_sample_phase(policy_traj) if activation_phase is None else activation_phase
+        muscle_data_myo = align_activation_to_observation_timeline(
+            policy_traj[f"episode_{episode}_muscle_activations"],
+            phase,
+        )
 
     feet_contacts = get_feet_contacts(touch_sensors_data=touch, threshold=0.05)
 
@@ -144,6 +161,7 @@ def extract_trajectory_data(
     *,
     subject_based: bool,
     motion_list=None,
+    muscle_signal="activation",
 ) -> ExtractedRollout:
     """Extract and process trajectory data from a given .npz file path.
 
@@ -162,6 +180,8 @@ def extract_trajectory_data(
         expected_activation_width=len(muscle_names_myo),
     )
     activation_phase = activation_sample_phase(policy_traj)
+    if muscle_signal == "excitation":
+        _require_muscle_commands(policy_traj, n_episodes, npz_path)
     all_joint_gaits_myo = []
     all_joint_gaits_myo_ref = []
     all_muscle_gaits_myo = []
@@ -235,6 +255,7 @@ def extract_trajectory_data(
             episode,
             expected_n=max(1, round(reference_length / 100)),
             activation_phase=activation_phase,
+            muscle_signal=muscle_signal,
         )
 
         if len(episode_gait_lengths) > 0:
@@ -411,6 +432,7 @@ def load_policy_run(
     *,
     subject_based: bool,
     motion_list=None,
+    muscle_signal="activation",
 ) -> PolicyRun:
     """Load one validated rollout and its optional earlier-trial companion."""
     if not isinstance(policy, PolicySpec):
@@ -424,6 +446,7 @@ def load_policy_run(
         policy.trajectory_path,
         subject_based=subject_based,
         motion_list=motion_list,
+        muscle_signal=muscle_signal,
     )
 
     # Optional trials-1-4 rollouts for the policy within-subject variability reference:
@@ -453,6 +476,7 @@ def load_policy_run(
             policy.earlier_trials_path,
             subject_based=subject_based,
             motion_list=trials_1_4_motion_list,
+            muscle_signal=muscle_signal,
         ).cycles
 
     if extracted.all_gait_lengths.shape[0] > 0:
