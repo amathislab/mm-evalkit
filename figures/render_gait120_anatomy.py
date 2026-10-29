@@ -13,6 +13,7 @@ an editable .blend file. No simulation or evaluation results are changed.
 from __future__ import annotations
 
 import argparse
+import itertools
 import json
 import math
 import subprocess
@@ -147,7 +148,7 @@ def render_blender(scene_path: Path) -> None:
         spline = data.splines.new("POLY")
         # Subdivide without moving any evaluated path out of its geometry.
         coords = []
-        for a, b in zip(points[:-1], points[1:], strict=True):
+        for a, b in itertools.pairwise(points):
             for step in range(12):
                 t = step / 12
                 coords.append(tuple((1 - t) * x + t * y for x, y in zip(a, b, strict=True)))
@@ -166,8 +167,11 @@ def render_blender(scene_path: Path) -> None:
     for path in payload["paths"]:
         selected = path["highlight"]
         obj = curve(
-            path["name"], path["points"], 0.012 if selected else 0.0009,
-            highlight_mat if selected else muted_mat, belly=selected,
+            path["name"],
+            path["points"],
+            0.012 if selected else 0.0009,
+            highlight_mat if selected else muted_mat,
+            belly=selected,
         )
         muscle_objects.append(obj)
 
@@ -178,8 +182,14 @@ def render_blender(scene_path: Path) -> None:
         x -= 0.09
         radius = {"Hip": 0.064, "Knee": 0.055, "Ankle": 0.046}[label]
         start, end = math.radians(-55), math.radians(62)
-        points = [[x, y + radius * math.cos(start + (end - start) * i / 40),
-                   z + radius * math.sin(start + (end - start) * i / 40)] for i in range(41)]
+        points = [
+            [
+                x,
+                y + radius * math.cos(start + (end - start) * i / 40),
+                z + radius * math.sin(start + (end - start) * i / 40),
+            ]
+            for i in range(41)
+        ]
         angle_objects.append(curve(f"{label} rotation arc", points, 0.003, angle_mat))
         for angle in (start, end):
             endpoint = [x, y + radius * math.cos(angle), z + radius * math.sin(angle)]
@@ -187,8 +197,9 @@ def render_blender(scene_path: Path) -> None:
         # Filled arrowhead at the end of the arc.
         tip = Vector(points[-1])
         tangent = Vector((0, -math.sin(end), math.cos(end)))
-        bpy.ops.mesh.primitive_cone_add(vertices=24, radius1=0.008, radius2=0, depth=0.022,
-                                      location=tip - tangent * 0.004)
+        bpy.ops.mesh.primitive_cone_add(
+            vertices=24, radius1=0.008, radius2=0, depth=0.022, location=tip - tangent * 0.004
+        )
         obj = bpy.context.object
         obj.name = f"{label} rotation arrow"
         obj.rotation_euler = tangent.to_track_quat("Z", "Y").to_euler()
@@ -228,9 +239,11 @@ def render_blender(scene_path: Path) -> None:
         for obj in angle_objects:
             obj.hide_render = view != "angles"
         bpy.context.view_layer.update()
-        points = payload["joints"] if view == "angles" else {
-            key: xyz for key, xyz in payload["anchors"].items() if HIGHLIGHTS[key]["view"] == view
-        }
+        points = (
+            payload["joints"]
+            if view == "angles"
+            else {key: xyz for key, xyz in payload["anchors"].items() if HIGHLIGHTS[key]["view"] == view}
+        )
         projections[view] = {}
         for key, xyz in points.items():
             if view == "angles":
@@ -239,11 +252,19 @@ def render_blender(scene_path: Path) -> None:
             projections[view][key] = [point.x, point.y]
         scene.render.filepath = str(output_dir / f"{view}.png")
         bpy.ops.render.render(write_still=True)
-    (output_dir / "legend.json").write_text(json.dumps({
-        "model": "MyoFullBody", "highlight_color": payload["highlight_color"],
-        "muscles": HIGHLIGHTS, "projections": projections,
-        "note": "Model muscle paths; illustrative thickness. Rotation arcs are schematic.",
-    }, indent=2) + "\n")
+    (output_dir / "legend.json").write_text(
+        json.dumps(
+            {
+                "model": "MyoFullBody",
+                "highlight_color": payload["highlight_color"],
+                "muscles": HIGHLIGHTS,
+                "projections": projections,
+                "note": "Model muscle paths; illustrative thickness. Rotation arcs are schematic.",
+            },
+            indent=2,
+        )
+        + "\n"
+    )
     bpy.ops.wm.save_as_mainfile(filepath=str(output_dir / "gait120_anatomy.blend"))
 
 
@@ -260,10 +281,20 @@ def main() -> None:
     output = args.output_dir.resolve()
     output.mkdir(parents=True, exist_ok=True)
     scene_path = export_model(output)
-    subprocess.run([
-        args.blender, "--background", "--threads", "8", "--python", str(Path(__file__).resolve()),
-        "--", "--blender-scene", str(scene_path),
-    ], check=True)
+    subprocess.run(
+        [
+            args.blender,
+            "--background",
+            "--threads",
+            "8",
+            "--python",
+            str(Path(__file__).resolve()),
+            "--",
+            "--blender-scene",
+            str(scene_path),
+        ],
+        check=True,
+    )
 
 
 if __name__ == "__main__":

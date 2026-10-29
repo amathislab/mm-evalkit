@@ -167,7 +167,9 @@ def _window_samples(
     in_window = (frame_indices >= start) & (frame_indices < end)
     covered = frame_indices[in_window]
     contiguous = np.array_equal(covered, np.arange(start, start + len(covered)))
-    required = end - start if kinetics_window == "left_heel_strike" else int(np.ceil(MIN_STRIDE_COVERAGE * (end - start)))
+    required = (
+        end - start if kinetics_window == "left_heel_strike" else int(np.ceil(MIN_STRIDE_COVERAGE * (end - start)))
+    )
     return in_window if contiguous and len(covered) >= required else None
 
 
@@ -443,9 +445,7 @@ def _load_rollout_policy_kinetics(
                     )
                 )
                 continue
-            reference = load_gait120_kinetics_trial(
-                reference_path, window=kinetics_window, torque_joints=torque_joints
-            )
+            reference = load_gait120_kinetics_trial(reference_path, window=kinetics_window, torque_joints=torque_joints)
             key = (reference.subject, reference.trial)
             existing = references.get(key)
             if existing is not None and existing.path != reference.path:

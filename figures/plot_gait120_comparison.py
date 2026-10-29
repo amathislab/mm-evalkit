@@ -370,10 +370,13 @@ def population_scope(data: dict) -> None:
             names, profile, human = data[names_key], run[profile_key], data[human_key]
             scores = {"corr": paired_pearson} if layer == "muscle" else {"corr": paired_pearson, "rmse": paired_rmse}
             for kind, score in scores.items():
-                values = {name: np.array([score(profile[index], subject[index]) for subject in human])
-                          for index, name in enumerate(names)}
-                values[aggregate] = np.array([finite_mean([values[name][position] for name in names])
-                                              for position in range(len(human))])
+                values = {
+                    name: np.array([score(profile[index], subject[index]) for subject in human])
+                    for index, name in enumerate(names)
+                }
+                values[aggregate] = np.array(
+                    [finite_mean([values[name][position] for name in names]) for position in range(len(human))]
+                )
                 run[f"{layer}_{kind}"] = values
     data["metric_scope"] = "population"
 
@@ -420,15 +423,28 @@ def _style_axis(ax) -> None:
     ax.tick_params(length=3, width=0.7, pad=2, labelsize=TICK_LABEL_SIZE)
 
 
-def _waveform(ax, human, policies, *, title, ylabel, xlabel=None, line_scale=1.0, human_color=HUMAN_TRACE,
-              zero_linestyle="-", zero_color=GRID) -> None:
+def _waveform(
+    ax,
+    human,
+    policies,
+    *,
+    title,
+    ylabel,
+    xlabel=None,
+    line_scale=1.0,
+    human_color=HUMAN_TRACE,
+    zero_linestyle="-",
+    zero_color=GRID,
+) -> None:
     """Every retained subject in grey behind the policy means, no spread bands."""
     for subject in np.asarray(human, dtype=float):
-        ax.plot(PHASE, subject, color=human_color, linewidth=0.9 * line_scale, alpha=0.75, zorder=2,
-                solid_capstyle="round")
+        ax.plot(
+            PHASE, subject, color=human_color, linewidth=0.9 * line_scale, alpha=0.75, zorder=2, solid_capstyle="round"
+        )
     for mean, color, linestyle in policies:
-        ax.plot(PHASE, mean, color=color, linewidth=2.1 * line_scale, linestyle=linestyle, zorder=6,
-                solid_capstyle="round")
+        ax.plot(
+            PHASE, mean, color=color, linewidth=2.1 * line_scale, linestyle=linestyle, zorder=6, solid_capstyle="round"
+        )
     ax.axhline(0.0, color=zero_color, linewidth=0.7, linestyle=zero_linestyle, zorder=1)
     ax.set_xlim(0, 100)
     ax.set_xticks([0, 50, 100])
@@ -551,9 +567,13 @@ def _anatomy_legend(fig, slot, anatomy_dir: Path) -> None:
     legend = json.loads((anatomy_dir / "legend.json").read_text())
     views = slot.subgridspec(1, 3, wspace=0.08)
     muscle_labels = {"vaslat_r": "VL", "tibant_r": "TA", "bflh_r": "BF", "gasmed_r": "GM"}
-    for index, (view, title) in enumerate([
-        ("anterior", "Anterior"), ("posterior", "Posterior"), ("angles", "Sagittal"),
-    ]):
+    for index, (view, title) in enumerate(
+        [
+            ("anterior", "Anterior"),
+            ("posterior", "Posterior"),
+            ("angles", "Sagittal"),
+        ]
+    ):
         ax = fig.add_subplot(views[index])
         ax.imshow(plt.imread(anatomy_dir / f"{view}.png"), extent=(0, 1, 0, 1), aspect="auto")
         ax.set(xlim=(0, 1), ylim=(0, 1))
@@ -564,22 +584,34 @@ def _anatomy_legend(fig, slot, anatomy_dir: Path) -> None:
             label = key if view == "angles" else muscle_labels[key]
             label_x = 0.98 if view == "angles" else 0.04
             ax.annotate(
-                label, xy=point, xytext=(label_x, point[1] + 0.015),
-                ha="right" if view == "angles" else "left", va="center",
-                fontsize=12, fontweight="bold", color=color,
+                label,
+                xy=point,
+                xytext=(label_x, point[1] + 0.015),
+                ha="right" if view == "angles" else "left",
+                va="center",
+                fontsize=12,
+                fontweight="bold",
+                color=color,
                 arrowprops={"arrowstyle": "-", "color": color, "lw": 0.9},
                 bbox={"facecolor": "white", "edgecolor": "none", "pad": 1.2, "alpha": 0.9},
             )
     bounds = slot.get_position(fig)
     fig.text(
-        (bounds.x0 + bounds.x1) / 2, bounds.y1 + 0.047,
-        "MyoFullBody · right leg", ha="center", fontsize=TITLE_SIZE,
+        (bounds.x0 + bounds.x1) / 2,
+        bounds.y1 + 0.047,
+        "MyoFullBody · right leg",
+        ha="center",
+        fontsize=TITLE_SIZE,
     )
     fig.text(
-        bounds.x0, bounds.y0 - 0.035,
-        "VL  Vastus lateralis     BF  Biceps femoris (long head)\n"
-        "TA  Tibialis anterior     GM  Gastrocnemius medialis",
-        ha="left", va="top", fontsize=10, color=INK_MUTED, linespacing=1.6,
+        bounds.x0,
+        bounds.y0 - 0.035,
+        "VL  Vastus lateralis     BF  Biceps femoris (long head)\nTA  Tibialis anterior     GM  Gastrocnemius medialis",
+        ha="left",
+        va="top",
+        fontsize=10,
+        color=INK_MUTED,
+        linespacing=1.6,
     )
 
 
@@ -592,9 +624,11 @@ def _pose_crop(images: list[np.ndarray]) -> tuple[int, int, int]:
     rows = np.flatnonzero(np.any(np.stack([image[..., 3] for image in images]).max(axis=0) > 0.03, axis=1))
     top, bottom = int(rows[0]) - 4, int(rows[-1]) + 4
     columns = np.flatnonzero(np.stack([image[top:bottom, :, 3] for image in images]).max(axis=(0, 1)) > 0.03)
-    widest_px = max(
-        np.ptp(np.flatnonzero(image[top:bottom, :, 3].max(axis=0) > 0.03)) for image in images
-    ) if len(columns) else 1
+    widest_px = (
+        max(np.ptp(np.flatnonzero(image[top:bottom, :, 3].max(axis=0) > 0.03)) for image in images)
+        if len(columns)
+        else 1
+    )
     return top, bottom, int(widest_px)
 
 
@@ -629,7 +663,9 @@ def _pose_strip(fig, ax, sequence_dir: Path, manifest: dict, category: str, *, m
         ax.imshow(
             image[top:bottom],
             extent=(phase - hip_px * units_per_px, phase + (image.shape[1] - hip_px) * units_per_px, 0, height_px),
-            interpolation="antialiased", clip_on=False, zorder=3,
+            interpolation="antialiased",
+            clip_on=False,
+            zorder=3,
         )
     ax.set_aspect("auto")
 
@@ -655,8 +691,16 @@ def _stance_bar(ax, stance: Sequence[bool | None], *, fontsize: float = 13) -> N
         on = bool(state[lo])
         ax.axvspan(lo, min(hi, 100), color=INK_MUTED if on else GRID, alpha=0.85 if on else 0.55, lw=0, zorder=1)
         if hi - lo >= 14:
-            ax.text((lo + min(hi, 100)) / 2, 0.5, "stance" if on else "swing", ha="center", va="center",
-                    fontsize=fontsize, color=SURFACE if on else INK_MUTED, zorder=2)
+            ax.text(
+                (lo + min(hi, 100)) / 2,
+                0.5,
+                "stance" if on else "swing",
+                ha="center",
+                va="center",
+                fontsize=fontsize,
+                color=SURFACE if on else INK_MUTED,
+                zorder=2,
+            )
     ax.set(xlim=(0, 100), ylim=(0, 1))
     ax.axis("off")
 
@@ -670,10 +714,19 @@ def label_pose(strip, to_data, labels, *, dot=None) -> None:
     """Label the heel-strike pose; a negative offset places the label behind the leg."""
     for name, label, dx in labels:
         x, y = to_data(0, name)
-        strip.annotate(label, (x, y), xytext=(dx, 0), textcoords="offset points",
-                       ha="right" if dx < 0 else "left", va="center", fontsize=14.5, color=INK,
-                       zorder=6, annotation_clip=False,
-                       arrowprops={"arrowstyle": "-", "lw": 0.7, "color": INK_MUTED, "shrinkA": 1.5, "shrinkB": 0})
+        strip.annotate(
+            label,
+            (x, y),
+            xytext=(dx, 0),
+            textcoords="offset points",
+            ha="right" if dx < 0 else "left",
+            va="center",
+            fontsize=14.5,
+            color=INK,
+            zorder=6,
+            annotation_clip=False,
+            arrowprops={"arrowstyle": "-", "lw": 0.7, "color": INK_MUTED, "shrinkA": 1.5, "shrinkB": 0},
+        )
         if dot:
             strip.plot(x, y, "o", ms=3.4, mfc=dot, mec=SURFACE, mew=0.6, zorder=7, clip_on=False)
 
@@ -692,23 +745,43 @@ def label_joints_column(fig, strip, to_data, labels, *, offset_pt=24.0, fontsize
     anchor = min(x for x, _ in points.values()) - offset_pt * x_per_pt
     for name, label, dy in labels:
         x, y = points[name]
-        strip.annotate(label, (x, y), xytext=(anchor, y + dy * y_per_pt), textcoords="data",
-                       ha="right", va="center", fontsize=fontsize, color=INK, zorder=6, annotation_clip=False,
-                       arrowprops={"arrowstyle": "-", "lw": 0.7, "color": INK_MUTED, "shrinkA": 1.5, "shrinkB": 0})
+        strip.annotate(
+            label,
+            (x, y),
+            xytext=(anchor, y + dy * y_per_pt),
+            textcoords="data",
+            ha="right",
+            va="center",
+            fontsize=fontsize,
+            color=INK,
+            zorder=6,
+            annotation_clip=False,
+            arrowprops={"arrowstyle": "-", "lw": 0.7, "color": INK_MUTED, "shrinkA": 1.5, "shrinkB": 0},
+        )
 
 
 # Joint landmarks of the joints strip; dy_pt fans out the three foot joints.
-JOINT_POSE_LABELS = [("hip_flexion_r", "Hip", 0), ("knee_angle_r", "Knee", 0), ("ankle_angle_r", "Ankle", 20),
-                     ("subtalar_angle_r", "Subtalar", 4), ("mtp_angle_r", "MTP", -12)]
+JOINT_POSE_LABELS = [
+    ("hip_flexion_r", "Hip", 0),
+    ("knee_angle_r", "Knee", 0),
+    ("ankle_angle_r", "Ankle", 20),
+    ("subtalar_angle_r", "Subtalar", 4),
+    ("mtp_angle_r", "MTP", -12),
+]
 
 
-def _muscle_colour_bar(fig, ax, manifest: dict, label: str, bounds=(0.80, 1.04, 0.20, 0.05),
-                       orientation: str = "horizontal") -> None:
+def _muscle_colour_bar(
+    fig, ax, manifest: dict, label: str, bounds=(0.80, 1.04, 0.20, 0.05), orientation: str = "horizontal"
+) -> None:
     low, high = manifest["muscle_colour_ramp"]
     cmap = mpl.colors.LinearSegmentedColormap.from_list("muscle_colour", [low, high])
     cax = ax.inset_axes(list(bounds))
-    cbar = fig.colorbar(mpl.cm.ScalarMappable(norm=mpl.colors.Normalize(0, 1), cmap=cmap),
-                        cax=cax, orientation=orientation, ticks=[0, 1])
+    cbar = fig.colorbar(
+        mpl.cm.ScalarMappable(norm=mpl.colors.Normalize(0, 1), cmap=cmap),
+        cax=cax,
+        orientation=orientation,
+        ticks=[0, 1],
+    )
     cbar.outline.set_visible(False)
     cax.tick_params(labelsize=13, length=0, pad=1.5)
     if orientation == "horizontal":
@@ -731,13 +804,24 @@ def _render_overlay_figure(data: dict, output_dir: Path, sequence_dir: Path) -> 
     runs = {run["id"]: run for run in data["policies"]}
     fig = plt.figure(figsize=(15.5, 1.62 * len(rows) + 1.5))
     grid = fig.add_gridspec(
-        len(rows) + 1, 3, width_ratios=[0.34, 1, 1], height_ratios=[*[1] * len(rows), 0.16],
-        left=0.01, right=0.985, top=1 - 0.95 / fig.get_figheight(), bottom=0.02, wspace=0.26, hspace=0.18,
+        len(rows) + 1,
+        3,
+        width_ratios=[0.34, 1, 1],
+        height_ratios=[*[1] * len(rows), 0.16],
+        left=0.01,
+        right=0.985,
+        top=1 - 0.95 / fig.get_figheight(),
+        bottom=0.02,
+        wspace=0.26,
+        hspace=0.18,
     )
-    for col, (title, subtitle) in enumerate([
-        ("Vertical GRF", "Mean right-foot force" + ("" if stride_kinetics else ", 1.00 s from left heel strike")),
-        (f"Muscle {signal} vs EMG", f"Mean {signal} (policies) and MVC-norm. EMG (Gait120), one 0–1 scale"),
-    ], start=1):
+    for col, (title, subtitle) in enumerate(
+        [
+            ("Vertical GRF", "Mean right-foot force" + ("" if stride_kinetics else ", 1.00 s from left heel strike")),
+            (f"Muscle {signal} vs EMG", f"Mean {signal} (policies) and MVC-norm. EMG (Gait120), one 0–1 scale"),  # noqa: RUF001
+        ],
+        start=1,
+    ):
         box = grid[0, col].get_position(fig)
         fig.text(box.x0, 1 - 0.36 / fig.get_figheight(), title, fontsize=16, fontweight="bold", va="baseline")
         fig.text(box.x0, 1 - 0.6 / fig.get_figheight(), subtitle, fontsize=12, color=INK_MUTED, va="baseline")
@@ -751,13 +835,27 @@ def _render_overlay_figure(data: dict, output_dir: Path, sequence_dir: Path) -> 
             name = overlay["label"]
         else:
             run = runs[key]
-            label_ax.plot([0.02, 0.17], [0.55, 0.55], color=run["color"], lw=2.4,
-                          linestyle=_line_style(run["linestyle"]), transform=label_ax.transAxes)
+            label_ax.plot(
+                [0.02, 0.17],
+                [0.55, 0.55],
+                color=run["color"],
+                lw=2.4,
+                linestyle=_line_style(run["linestyle"]),
+                transform=label_ax.transAxes,
+            )
             name = run["label"]
         # Long run names wrap at their hyphens so they stay inside the label column.
         lines = [textwrap.fill(part, 24, break_on_hyphens=True) for part in name.replace(" (", "\n(").split("\n")]
-        label_ax.text(0.22, 0.55, "\n".join(lines), fontsize=13, va="center", ha="left",
-                      linespacing=1.35, transform=label_ax.transAxes)
+        label_ax.text(
+            0.22,
+            0.55,
+            "\n".join(lines),
+            fontsize=13,
+            va="center",
+            ha="left",
+            linespacing=1.35,
+            transform=label_ax.transAxes,
+        )
         for col, category in enumerate(("kinetics", "muscles"), start=1):
             cell = grid[row, col].subgridspec(2, 1, height_ratios=[1, 0.13], hspace=0.06)
             strip = fig.add_subplot(cell[0])
@@ -807,27 +905,43 @@ def _render_sequence_figure(data: dict, output_dir: Path, sequence_dir: Path) ->
     right_stride = data.get("kinetics_window", "left_heel_strike") == "right_stride"
     fig = plt.figure(figsize=(23.5, 12.2))
     columns = fig.add_gridspec(
-        1, 6, width_ratios=[1, 0.03, 1, 1, 0.02, 0.95], left=0.048, right=0.988, bottom=0.055, top=0.952, wspace=0.40,
+        1,
+        6,
+        width_ratios=[1, 0.03, 1, 1, 0.02, 0.95],
+        left=0.048,
+        right=0.988,
+        bottom=0.055,
+        top=0.952,
+        wspace=0.40,
     )
     groups = _bar_groups(data)
     phases = manifest["phases"]
-    SLOTS = (0, 2, 3, 5)  # gridspec column of A, B, C and D
+    slots = (0, 2, 3, 5)  # gridspec column of A, B, C and D
 
     def series(group, metric):
         _, _, _, _, keys, human_source, run_keys, _ = group
         return [
             ("Gait120 between-subject", HUMAN_BAR, "///", [_finite(human_source[metric][k]) for k in keys]),
-            *[(run["label"], run["color"], "\\\\" if _is_dashed(run["linestyle"]) else None,
-               [_finite(run[run_keys[metric]][k]) for k in keys]) for run in data["policies"]],
+            *[
+                (
+                    run["label"],
+                    run["color"],
+                    "\\\\" if _is_dashed(run["linestyle"]) else None,
+                    [_finite(run[run_keys[metric]][k]) for k in keys],
+                )
+                for run in data["policies"]
+            ],
         ]
 
     def waveform(slot, key, names, channel, human_key, title, ylabel, *, bottom=False, seconds=False):
         ax = fig.add_subplot(slot)
         index = data[names].index(channel)
         _waveform(
-            ax, data[human_key][:, index],
+            ax,
+            data[human_key][:, index],
             [(run[key][index], run["color"], _line_style(run["linestyle"])) for run in data["policies"]],
-            title=title, ylabel=ylabel,
+            title=title,
+            ylabel=ylabel,
             xlabel=("Time from left heel strike [s]" if seconds else XLABEL) if bottom else None,
         )
         ax.set_title(title, loc="left", fontsize=17.5, pad=3)
@@ -854,7 +968,7 @@ def _render_sequence_figure(data: dict, output_dir: Path, sequence_dir: Path) ->
     def header(col, title, subtitle=None):
         # Narrow spacer columns sit after A, so B's first pose clears A's
         # last, and before D, which sets it further right.
-        box = columns[SLOTS[col]].get_position(fig)
+        box = columns[slots[col]].get_position(fig)
         fig.text(box.x0 - 0.032, 0.970, "ABCD"[col], fontsize=26, fontweight="bold", ha="left", va="baseline")
         fig.text(box.x0, 0.970, title, fontsize=21, fontweight="bold", ha="left", va="baseline")
         if subtitle:
@@ -868,42 +982,87 @@ def _render_sequence_figure(data: dict, output_dir: Path, sequence_dir: Path) ->
     ]
     for col, (category, title, subtitle) in enumerate(headers):
         box = header(col, title, subtitle)
-        block = columns[SLOTS[col]].subgridspec(3, 1, height_ratios=[1.18, 0.42, 5.6], hspace=0.0)
+        block = columns[slots[col]].subgridspec(3, 1, height_ratios=[1.18, 0.42, 5.6], hspace=0.0)
         first_axis = len(fig.axes)
         strip = fig.add_subplot(block[0])
-        to_data = _pose_strip(fig, strip, sequence_dir, manifest,
-                              category if category == "joints" else f"{category}_gait120")
+        to_data = _pose_strip(
+            fig, strip, sequence_dir, manifest, category if category == "joints" else f"{category}_gait120"
+        )
         stance_ax = block[1].subgridspec(3, 1, height_ratios=[0.12, 0.38, 1.0], hspace=0)[1]
         # Column B follows the kinetics window; A and C the right stride.
-        _stance_bar(fig.add_subplot(stance_ax), manifest["overlays"]["gait120"]["stance"] if category == "kinetics"
-                    else manifest["cycle_stance"])
+        _stance_bar(
+            fig.add_subplot(stance_ax),
+            manifest["overlays"]["gait120"]["stance"] if category == "kinetics" else manifest["cycle_stance"],
+        )
 
         if col == 0:
-            label_pose(strip, to_data, [("hip_flexion_r", "Hip", -24), ("knee_angle_r", "Knee", -24),
-                                        ("ankle_angle_r", "Ankle", -24)])
+            label_pose(
+                strip,
+                to_data,
+                [("hip_flexion_r", "Hip", -24), ("knee_angle_r", "Knee", -24), ("ankle_angle_r", "Ankle", -24)],
+            )
             # Same four-row grid as B and C, so panels match; the fourth row
             # holds the legend.
             waves = block[2].subgridspec(4, 1, hspace=0.40)
             for row, (channel, angle, _, _) in enumerate(JOINTS):
-                waveform(waves[row], "avg_joint", "joint_names", channel, "human_joint", angle, "Angle [deg]",
-                         bottom=row == 2)
+                waveform(
+                    waves[row],
+                    "avg_joint",
+                    "joint_names",
+                    channel,
+                    "human_joint",
+                    angle,
+                    "Angle [deg]",
+                    bottom=row == 2,
+                )
             legend_slot = waves[3]
         elif col == 1:
             waves = block[2].subgridspec(4, 1, hspace=0.40)
             for row, (channel, _, moment, _) in enumerate(JOINTS):
-                waveform(waves[row], "avg_torque", "torque_names", channel, "human_torque", moment,
-                         f"[{data['torque_unit']}]", seconds=not right_stride)
-            waveform(waves[3], "avg_grf", "grf_names", GRF_CHANNEL, "human_grf", "Vertical GRF",
-                     f"[{data['grf_unit']}]", bottom=True, seconds=not right_stride)
+                waveform(
+                    waves[row],
+                    "avg_torque",
+                    "torque_names",
+                    channel,
+                    "human_torque",
+                    moment,
+                    f"[{data['torque_unit']}]",
+                    seconds=not right_stride,
+                )
+            waveform(
+                waves[3],
+                "avg_grf",
+                "grf_names",
+                GRF_CHANNEL,
+                "human_grf",
+                "Vertical GRF",
+                f"[{data['grf_unit']}]",
+                bottom=True,
+                seconds=not right_stride,
+            )
         else:
             label_pose(strip, to_data, MUSCLE_POSE_LABELS, dot=INK)
             # In the gutter before column D, clear of the title and the poses.
-            _muscle_colour_bar(fig, strip, manifest, manifest["overlays"]["gait120"]["colour_label"].replace(" (", "\n("),
-                               bounds=(1.17, 0.12, 0.025, 0.8), orientation="vertical")
+            _muscle_colour_bar(
+                fig,
+                strip,
+                manifest,
+                manifest["overlays"]["gait120"]["colour_label"].replace(" (", "\n("),
+                bounds=(1.17, 0.12, 0.025, 0.8),
+                orientation="vertical",
+            )
             waves = block[2].subgridspec(4, 1, hspace=0.40)
             for row, (muscle, name, short) in enumerate(MUSCLES):
-                ax = waveform(waves[row], "avg_muscle", "muscle_names", muscle, "human_muscle",
-                              f"{short} · {name}", signal.capitalize(), bottom=row == 3)
+                ax = waveform(
+                    waves[row],
+                    "avg_muscle",
+                    "muscle_names",
+                    muscle,
+                    "human_muscle",
+                    f"{short} · {name}",
+                    signal.capitalize(),
+                    bottom=row == 3,
+                )
                 # Policy signal and MVC-normalized EMG share one 0-1 scale; the
                 # right axis mirrors it so each side names its own trace.
                 emg = ax.secondary_yaxis("right")
@@ -915,17 +1074,32 @@ def _render_sequence_figure(data: dict, output_dir: Path, sequence_dir: Path) ->
     # Column D: agreement with Gait120, one section per physiological column.
     box = header(3, "Policy comparison")
     # The hatched human bars are only in this column, so their key sits here.
-    fig.legend(handles=[Patch(facecolor=HUMAN_BAR, alpha=0.45, hatch="///", edgecolor=HUMAN_BAR,
-                              label="Gait120 between-subject")],
-               loc="upper left", bbox_to_anchor=(box.x0 - 0.004, 0.944), frameon=False, fontsize=15,
-               handlelength=1.9, handletextpad=0.5, borderaxespad=0, borderpad=0)
+    fig.legend(
+        handles=[
+            Patch(facecolor=HUMAN_BAR, alpha=0.45, hatch="///", edgecolor=HUMAN_BAR, label="Gait120 between-subject")
+        ],
+        loc="upper left",
+        bbox_to_anchor=(box.x0 - 0.004, 0.944),
+        frameon=False,
+        fontsize=15,
+        handlelength=1.9,
+        handletextpad=0.5,
+        borderaxespad=0,
+        borderpad=0,
+    )
     # The first row is a spacer that keeps the subtitle clear of the first bar title.
-    rows = columns[SLOTS[3]].subgridspec(6, 1, height_ratios=[0.06, 1, 1, 1, 1, 1.15], hspace=0.66)
+    rows = columns[slots[3]].subgridspec(6, 1, height_ratios=[0.06, 1, 1, 1, 1, 1.15], hspace=0.66)
     metrics = [rows[index] for index in range(1, 6)]
     first_axis = len(fig.axes)
     for metric in range(2):
-        bars(metrics[metric], groups[0][3], series(groups[0], metric), groups[0][-1][metric], metric,
-             title="Joint angles" if metric == 0 else None)
+        bars(
+            metrics[metric],
+            groups[0][3],
+            series(groups[0], metric),
+            groups[0][-1][metric],
+            metric,
+            title="Joint angles" if metric == 0 else None,
+        )
     torque_series, grf_series = series(groups[1], 0), series(groups[2], 0)
     combined = [(a[0], a[1], a[2], a[3] + b[3]) for a, b in zip(torque_series, grf_series, strict=True)]
     bars(metrics[2], ["Hip", "Knee", "Ankle", "vGRF"], combined, "Pearson r", 2, title="Joint moments & vGRF")
@@ -940,30 +1114,50 @@ def _render_sequence_figure(data: dict, output_dir: Path, sequence_dir: Path) ->
     labels = [run["label"] for run in data["policies"]]
     prefix = labels[0].split(" (")[0] if all(" (" in label for label in labels) else ""
     if prefix and all(label.startswith(f"{prefix} (") for label in labels):
-        labels = [label[len(prefix) + 2:].rstrip(")") for label in labels]
+        labels = [label[len(prefix) + 2 :].rstrip(")") for label in labels]
     else:
         prefix = "Policies"
     # A shared stem such as "mm-motions-" also moves into the title.
     stem = os.path.commonprefix(labels)
     stem = stem[: stem.rfind("-") + 1] if "-" in stem else ""
-    if stem and all(label[len(stem):] for label in labels):
-        prefix, labels = f"{prefix} · {stem.rstrip('-')}", [label[len(stem):] for label in labels]
+    if stem and all(label[len(stem) :] for label in labels):
+        prefix, labels = f"{prefix} · {stem.rstrip('-')}", [label[len(stem) :] for label in labels]
     legend_ax = fig.add_subplot(legend_slot)
     legend_ax.axis("off")
-    style = {"frameon": False, "fontsize": 15.5, "title_fontsize": 16.5, "handlelength": 1.9, "ncol": 2,
-             "borderaxespad": 0, "labelspacing": 0.4, "columnspacing": 1.1, "handletextpad": 0.5,
-             "alignment": "left"}
+    style = {
+        "frameon": False,
+        "fontsize": 15.5,
+        "title_fontsize": 16.5,
+        "handlelength": 1.9,
+        "ncol": 2,
+        "borderaxespad": 0,
+        "labelspacing": 0.4,
+        "columnspacing": 1.1,
+        "handletextpad": 0.5,
+        "alignment": "left",
+    }
     human = legend_ax.legend(
         handles=[Line2D([], [], color=HUMAN_TRACE, lw=1.4, label="Subjects")],
-        title="Gait120", loc="upper left", bbox_to_anchor=(0.04, 0.93), **style,
+        title="Gait120",
+        loc="upper left",
+        bbox_to_anchor=(0.04, 0.93),
+        **style,
     )
     legend_ax.add_artist(human)
     policies = legend_ax.legend(
-        handles=[Line2D([], [], color=r["color"], lw=2.2, linestyle=_line_style(r["linestyle"]), label=label)
-                 for r, label in zip(data["policies"], labels, strict=True)],
-        title=prefix, loc="upper left", bbox_to_anchor=(0.04, 0.47),
-        **{**style, "ncol": len(labels) if len(labels) <= 4 and max(map(len, labels)) <= 4 else 2,
-           "columnspacing": 0.8, "handlelength": 1.7},
+        handles=[
+            Line2D([], [], color=r["color"], lw=2.2, linestyle=_line_style(r["linestyle"]), label=label)
+            for r, label in zip(data["policies"], labels, strict=True)
+        ],
+        title=prefix,
+        loc="upper left",
+        bbox_to_anchor=(0.04, 0.47),
+        **{
+            **style,
+            "ncol": len(labels) if len(labels) <= 4 and max(map(len, labels)) <= 4 else 2,
+            "columnspacing": 0.8,
+            "handlelength": 1.7,
+        },
     )
     for legend in (human, policies):
         legend.get_title().set_fontweight("bold")
@@ -972,11 +1166,20 @@ def _render_sequence_figure(data: dict, output_dir: Path, sequence_dir: Path) ->
     extent = mpl.transforms.Bbox.union([legend.get_window_extent(renderer) for legend in (human, policies)])
     (x0, y0), (x1, y1) = legend_ax.transAxes.inverted().transform(extent.get_points())
     pad_x, pad_y = 0.035, 0.07
-    legend_ax.add_patch(FancyBboxPatch(
-        (x0 - pad_x, y0 - pad_y), x1 - x0 + 2 * pad_x, y1 - y0 + 2 * pad_y,
-        boxstyle="round,pad=0,rounding_size=0.03", transform=legend_ax.transAxes,
-        facecolor=SURFACE, edgecolor=GRID, linewidth=1.0, clip_on=False, zorder=0,
-    ))
+    legend_ax.add_patch(
+        FancyBboxPatch(
+            (x0 - pad_x, y0 - pad_y),
+            x1 - x0 + 2 * pad_x,
+            y1 - y0 + 2 * pad_y,
+            boxstyle="round,pad=0,rounding_size=0.03",
+            transform=legend_ax.transAxes,
+            facecolor=SURFACE,
+            edgecolor=GRID,
+            linewidth=1.0,
+            clip_on=False,
+            zorder=0,
+        )
+    )
 
     # Preserve exactly the original channel-wise metric export, regardless of layout.
     rows_csv = []
@@ -986,15 +1189,19 @@ def _render_sequence_figure(data: dict, output_dir: Path, sequence_dir: Path) ->
                 continue
             for label, _, _, values in series(group, metric):
                 for key, sample in zip(group[4], values, strict=True):
-                    rows_csv.append({
-                        "signal": group[2], "channel": key,
-                        "metric": "pearson_r" if metric == 0 else "rmse",
-                        "unit": "" if metric == 0 else group[-1][metric].split("[")[-1].rstrip("]"),
-                        "entity": label, "n": len(sample),
-                        "mean": float(np.mean(sample)) if len(sample) else np.nan,
-                        "sd": float(np.std(sample)) if len(sample) else np.nan,
-                        "values": ";".join(f"{value:.6g}" for value in sample),
-                    })
+                    rows_csv.append(
+                        {
+                            "signal": group[2],
+                            "channel": key,
+                            "metric": "pearson_r" if metric == 0 else "rmse",
+                            "unit": "" if metric == 0 else group[-1][metric].split("[")[-1].rstrip("]"),
+                            "entity": label,
+                            "n": len(sample),
+                            "mean": float(np.mean(sample)) if len(sample) else np.nan,
+                            "sd": float(np.std(sample)) if len(sample) else np.nan,
+                            "values": ";".join(f"{value:.6g}" for value in sample),
+                        }
+                    )
     output_dir.mkdir(parents=True, exist_ok=True)
     stem = _stem(data)
     for suffix in ("png", "svg", "pdf"):
@@ -1010,8 +1217,17 @@ def _render_sequence_figure(data: dict, output_dir: Path, sequence_dir: Path) ->
 # Pose labels of the extended muscle strips: anterior muscles in front of the
 # leg (positive offset), the rest behind it, where the next pose leaves room.
 EXTENDED_POSE_SIDES = {
-    "vaslat_r": 1, "vasmed_r": 1, "recfem_r": 1, "bflh_r": -1, "semiten_r": -1,
-    "tibant_r": 1, "perlong_r": -1, "perbrev_r": -1, "gasmed_r": -1, "gaslat_r": -1, "soleus_r": -1,
+    "vaslat_r": 1,
+    "vasmed_r": 1,
+    "recfem_r": 1,
+    "bflh_r": -1,
+    "semiten_r": -1,
+    "tibant_r": 1,
+    "perlong_r": -1,
+    "perbrev_r": -1,
+    "gasmed_r": -1,
+    "gaslat_r": -1,
+    "soleus_r": -1,
 }
 
 
@@ -1027,8 +1243,10 @@ def label_pose_stacked(fig, strip, to_data, names, *, offset_pt=22.0, gap_pt=15.
     x_per_pt = (x1 - x0) / (box.width * fig.get_figwidth() * 72)
     y_per_pt = (y1 - y0) / (box.height * fig.get_figheight() * 72)
     for side in (1, -1):
-        points = sorted(((to_data(0, name), name) for name in names if EXTENDED_POSE_SIDES[name] == side),
-                        key=lambda item: -item[0][1])
+        points = sorted(
+            ((to_data(0, name), name) for name in names if EXTENDED_POSE_SIDES[name] == side),
+            key=lambda item: -item[0][1],
+        )
         if not points:
             continue
         ys = [y for (_, y), _ in points]
@@ -1039,11 +1257,20 @@ def label_pose_stacked(fig, strip, to_data, names, *, offset_pt=22.0, gap_pt=15.
         # Every label sits in one column, clear of the leg on its side.
         anchor = (max if side > 0 else min)(x for (x, _), _ in points) + side * offset_pt * x_per_pt
         for ((x, y), name), label_y in zip(points, placed, strict=True):
-            strip.annotate(short[name], (x, y), xytext=(anchor, label_y + shift), textcoords="data",
-                           ha="left" if side > 0 else "right", va="center", fontsize=fontsize, color=INK,
-                           zorder=6, annotation_clip=False,
-                           path_effects=[patheffects.withStroke(linewidth=3.5, foreground=SURFACE)],
-                           arrowprops={"arrowstyle": "-", "lw": 0.7, "color": INK_MUTED, "shrinkA": 1.5, "shrinkB": 0})
+            strip.annotate(
+                short[name],
+                (x, y),
+                xytext=(anchor, label_y + shift),
+                textcoords="data",
+                ha="left" if side > 0 else "right",
+                va="center",
+                fontsize=fontsize,
+                color=INK,
+                zorder=6,
+                annotation_clip=False,
+                path_effects=[patheffects.withStroke(linewidth=3.5, foreground=SURFACE)],
+                arrowprops={"arrowstyle": "-", "lw": 0.7, "color": INK_MUTED, "shrinkA": 1.5, "shrinkB": 0},
+            )
             strip.plot(x, y, "o", ms=3.4, mfc=INK, mec=SURFACE, mew=0.6, zorder=7, clip_on=False)
 
 
@@ -1098,12 +1325,18 @@ def _render_extended_figure(data: dict, output_dir: Path, sequence_dir: Path) ->
     width = left_in + 4 * col_in + 3 * gap_in + d_gap_in + d_in + right_in
     fig = plt.figure(figsize=(width, 10.0))
     block_in = 4 * col_in + 3 * gap_in
-    columns = fig.add_gridspec(1, 2, width_ratios=[block_in, d_in], wspace=d_gap_in / ((block_in + d_in) / 2),
-                               left=left_in / width, right=1 - right_in / width)
+    columns = fig.add_gridspec(
+        1,
+        2,
+        width_ratios=[block_in, d_in],
+        wspace=d_gap_in / ((block_in + d_in) / 2),
+        left=left_in / width,
+        right=1 - right_in / width,
+    )
     packed = columns[0].subgridspec(1, 4, wspace=gap_in / col_in)
-    SLOTS = (*(packed[index] for index in range(4)), columns[1])  # A, B, C-thigh, C-shank and D
+    slots = (*(packed[index] for index in range(4)), columns[1])  # A, B, C-thigh, C-shank and D
     strip_names = ["joints", "kinetics_gait120", *[f"muscles-{group}_gait120" for group in groups]]
-    width_in = SLOTS[0].get_position(fig).width * fig.get_figwidth()
+    width_in = slots[0].get_position(fig).width * fig.get_figwidth()
     strip_in = max(_pose_height_in(sequence_dir, manifest, name, width_in, max_pose_width) for name in strip_names)
     waves_in = n_rows * row_in + (n_rows - 1) * row_gap_in
     height = header_in + strip_in + stance_in + waves_in + legend_in
@@ -1126,13 +1359,17 @@ def _render_extended_figure(data: dict, output_dir: Path, sequence_dir: Path) ->
         if key in ("avg_torque", "avg_grf"):
             policies = [_circular_fill(trace) for trace in policies]
         _waveform(
-            ax, data[human_key][:, index],
+            ax,
+            data[human_key][:, index],
             [(trace, run["color"], _line_style(run["linestyle"])) for trace, run in zip(policies, runs, strict=True)],
-            title=title, ylabel="",
+            title=title,
+            ylabel="",
             xlabel=("Time from left heel strike [s]" if seconds else XLABEL) if bottom else None,
-            line_scale=1.3, human_color=HUMAN_TRACE,
+            line_scale=1.3,
+            human_color=HUMAN_TRACE,
             # Dotted, so the zero reference is not mistaken for a data trace.
-            zero_linestyle=(0, (1, 2.5)), zero_color=INK_MUTED,
+            zero_linestyle=(0, (1, 2.5)),
+            zero_color=INK_MUTED,
         )
         # The unit rides in the title, so the column needs no y label.
         ax.set_title(f"{title} [{unit}]" if unit else title, loc="left", fontsize=19.5, pad=3)
@@ -1157,48 +1394,92 @@ def _render_extended_figure(data: dict, output_dir: Path, sequence_dir: Path) ->
         return strip, to_data, block[2].subgridspec(rows, 1, hspace=row_gap_in / panel_in)
 
     # A: every right-leg joint angle.
-    header(SLOTS[0], "A", "Joint kinematics")
-    strip, to_data, waves = column(SLOTS[0], "joints", manifest["cycle_stance"], n_rows)
+    header(slots[0], "A", "Joint kinematics")
+    strip, to_data, waves = column(slots[0], "joints", manifest["cycle_stance"], n_rows)
     label_joints_column(fig, strip, to_data, JOINT_POSE_LABELS, fontsize=16.5)
     for row, (channel, title, _) in enumerate(joints):
-        waveform(waves[row], "avg_joint", "joint_names", channel, "human_joint", title, "deg",
-                 bottom=row == len(joints) - 1)
+        waveform(
+            waves[row], "avg_joint", "joint_names", channel, "human_joint", title, "deg", bottom=row == len(joints) - 1
+        )
 
     # B: moments and vertical GRF.
-    header(SLOTS[1], "B", "Joint moments & GRF", None if right_stride else "Left heel strike → +1.00 s")
-    _, _, waves = column(SLOTS[1], "kinetics_gait120", manifest["overlays"]["gait120"]["stance"], n_rows)
+    header(slots[1], "B", "Joint moments & GRF", None if right_stride else "Left heel strike → +1.00 s")
+    _, _, waves = column(slots[1], "kinetics_gait120", manifest["overlays"]["gait120"]["stance"], n_rows)
     for row, (channel, moment, _) in enumerate(moments):
-        waveform(waves[row], "avg_torque", "torque_names", channel, "human_torque", moment,
-                 data["torque_unit"], seconds=not right_stride)
-    waveform(waves[len(moments)], "avg_grf", "grf_names", GRF_CHANNEL, "human_grf", "Vertical GRF",
-             data["grf_unit"], bottom=True, seconds=not right_stride)
+        waveform(
+            waves[row],
+            "avg_torque",
+            "torque_names",
+            channel,
+            "human_torque",
+            moment,
+            data["torque_unit"],
+            seconds=not right_stride,
+        )
+    waveform(
+        waves[len(moments)],
+        "avg_grf",
+        "grf_names",
+        GRF_CHANNEL,
+        "human_grf",
+        "Vertical GRF",
+        data["grf_unit"],
+        bottom=True,
+        seconds=not right_stride,
+    )
 
     # C: every EMG muscle, one column per group under its own pose strip.
-    header(SLOTS[2], "C", f"Muscle {signal} vs EMG")
-    for slot, (group, muscles) in zip(SLOTS[2:4], groups.items(), strict=True):
+    header(slots[2], "C", f"Muscle {signal} vs EMG")
+    for slot, (group, muscles) in zip(slots[2:4], groups.items(), strict=True):
         strip, to_data, waves = column(slot, f"muscles-{group}_gait120", manifest["cycle_stance"], n_muscle_rows)
         # Each group is named on the subtitle line, under the shared C title.
-        fig.text(slot.get_position(fig).x0, 1 - 0.64 / height, group.capitalize(), fontsize=17,
-                 color=INK_MUTED, ha="left", va="baseline")
+        fig.text(
+            slot.get_position(fig).x0,
+            1 - 0.64 / height,
+            group.capitalize(),
+            fontsize=17,
+            color=INK_MUTED,
+            ha="left",
+            va="baseline",
+        )
         label_pose_stacked(fig, strip, to_data, muscles, gap_pt=17.0, fontsize=16.5)
-        if slot == SLOTS[3]:
+        if slot == slots[3]:
             # A short horizontal key on the subtitle line, clear of the poses.
-            _muscle_colour_bar(fig, strip, manifest, manifest["overlays"]["gait120"]["colour_label"],
-                               bounds=(0.55, 1 + 0.42 / strip_in, 0.42, 0.10 / strip_in))
+            _muscle_colour_bar(
+                fig,
+                strip,
+                manifest,
+                manifest["overlays"]["gait120"]["colour_label"],
+                bounds=(0.55, 1 + 0.42 / strip_in, 0.42, 0.10 / strip_in),
+            )
         for row, muscle in enumerate(muscles):
             name, short = names[muscle]
-            waveform(waves[row], "avg_muscle", "muscle_names", muscle, "human_muscle", f"{short} · {name}",
-                     bottom=row == len(muscles) - 1)
+            waveform(
+                waves[row],
+                "avg_muscle",
+                "muscle_names",
+                muscle,
+                "human_muscle",
+                f"{short} · {name}",
+                bottom=row == len(muscles) - 1,
+            )
 
     # D: agreement with Gait120 for every channel drawn in A-C.
-    box = header(SLOTS[4], "D", "Policy comparison")
+    header(slots[4], "D", "Policy comparison")
     human_joint, human_kinetics = data["human_metrics"], data["kinetics_human_metrics"]
 
     def series(human_source, run_key, keys):
         return [
             ("Gait120 between-subject", HUMAN_BAR, "///", [_finite(human_source[k]) for k in keys]),
-            *[(run["label"], run["color"], "\\\\" if _is_dashed(run["linestyle"]) else None,
-               [_finite(run[run_key][k]) for k in keys]) for run in runs],
+            *[
+                (
+                    run["label"],
+                    run["color"],
+                    "\\\\" if _is_dashed(run["linestyle"]) else None,
+                    [_finite(run[run_key][k]) for k in keys],
+                )
+                for run in runs
+            ],
         ]
 
     def bars(slot, labels, values, metric, seed, title=None):
@@ -1220,67 +1501,107 @@ def _render_extended_figure(data: dict, output_dir: Path, sequence_dir: Path) ->
     # (signal, channels, values, unit): drawn below and exported to the CSV.
     panels = {
         "angle_r": ("Joint angles", joint_keys, series(human_joint["joint_corr"], "joint_corr", joint_keys), ""),
-        "angle_rmse": ("Joint angles", joint_keys, series(human_joint["joint_rmse"], "joint_rmse", joint_keys),
-                       "deg"),
-        "torque_r": ("Joint moments", torque_keys,
-                     series(human_kinetics["torque_corr"], "torque_corr", torque_keys), ""),
+        "angle_rmse": ("Joint angles", joint_keys, series(human_joint["joint_rmse"], "joint_rmse", joint_keys), "deg"),
+        "torque_r": (
+            "Joint moments",
+            torque_keys,
+            series(human_kinetics["torque_corr"], "torque_corr", torque_keys),
+            "",
+        ),
         "grf_r": ("Vertical GRF", [GRF_CHANNEL], series(human_kinetics["grf_corr"], "grf_corr", [GRF_CHANNEL]), ""),
-        "torque_rmse": ("Joint moments", torque_keys,
-                        series(human_kinetics["torque_rmse"], "torque_rmse", torque_keys), data["torque_unit"]),
-        "grf_rmse": ("Vertical GRF", [GRF_CHANNEL], series(human_kinetics["grf_rmse"], "grf_rmse", [GRF_CHANNEL]),
-                     data["grf_unit"]),
-        **{f"muscle_{group}": (f"Muscle {signal} vs EMG", muscles,
-                               series(human_joint["muscle_corr"], "muscle_corr", muscles), "")
-           for group, muscles in groups.items()},
+        "torque_rmse": (
+            "Joint moments",
+            torque_keys,
+            series(human_kinetics["torque_rmse"], "torque_rmse", torque_keys),
+            data["torque_unit"],
+        ),
+        "grf_rmse": (
+            "Vertical GRF",
+            [GRF_CHANNEL],
+            series(human_kinetics["grf_rmse"], "grf_rmse", [GRF_CHANNEL]),
+            data["grf_unit"],
+        ),
+        **{
+            f"muscle_{group}": (
+                f"Muscle {signal} vs EMG",
+                muscles,
+                series(human_joint["muscle_corr"], "muscle_corr", muscles),
+                "",
+            )
+            for group, muscles in groups.items()
+        },
     }
     # The bars fill the full column height, from the strips' top to the panels' base.
-    rows = SLOTS[4].subgridspec(6, 1, hspace=0.70)
+    rows = slots[4].subgridspec(6, 1, hspace=0.70)
     bars(rows[0], joint_labels, panels["angle_r"][2], "Pearson r", 0, title="Joint angles")
     bars(rows[1], joint_labels, panels["angle_rmse"][2], "RMSE [deg]", 1, title="Joint angles")
-    combined = [(a[0], a[1], a[2], a[3] + b[3])
-                for a, b in zip(panels["torque_r"][2], panels["grf_r"][2], strict=True)]
+    combined = [(a[0], a[1], a[2], a[3] + b[3]) for a, b in zip(panels["torque_r"][2], panels["grf_r"][2], strict=True)]
     bars(rows[2], [*torque_labels, "vGRF"], combined, "Pearson r", 2, title="Joint moments & vGRF")
     errors = rows[3].subgridspec(1, 2, width_ratios=[len(moments), 0.95], wspace=0.45)
     # Seven groups share this narrower panel, so its channel names run a size smaller.
-    bars(errors[0], torque_labels, panels["torque_rmse"][2], f"RMSE [{data['torque_unit']}]", 3,
-         title="Joint moments").tick_params(axis="x", labelsize=14.5)
+    bars(
+        errors[0], torque_labels, panels["torque_rmse"][2], f"RMSE [{data['torque_unit']}]", 3, title="Joint moments"
+    ).tick_params(axis="x", labelsize=14.5)
     bars(errors[1], ["vGRF"], panels["grf_rmse"][2], f"RMSE [{data['grf_unit']}]", 4)
     for offset, (group, muscles) in enumerate(groups.items()):
-        bars(rows[4 + offset], [names[m][1] for m in muscles], panels[f"muscle_{group}"][2], "Pearson r",
-             4 + offset, title=f"{group.capitalize()} muscles")
+        bars(
+            rows[4 + offset],
+            [names[m][1] for m in muscles],
+            panels[f"muscle_{group}"][2],
+            "Pearson r",
+            4 + offset,
+            title=f"{group.capitalize()} muscles",
+        )
 
     # One horizontal legend along the bottom: Gait120, then the policies after
     # the label prefix they share, then the key to the hatched bars in D.
     labels = [run["label"] for run in runs]
     prefix = labels[0].split(" (")[0] if all(" (" in label for label in labels) else ""
     if prefix and all(label.startswith(f"{prefix} (") for label in labels):
-        labels = [label[len(prefix) + 2:].rstrip(")") for label in labels]
+        labels = [label[len(prefix) + 2 :].rstrip(")") for label in labels]
     else:
         prefix = "Policies"
     handles = [
         Line2D([], [], color=HUMAN_TRACE, lw=1.8, label=_human_trace_label(data)),
         Line2D([], [], linestyle="none", label=f"   {prefix}:"),
-        *[Line2D([], [], color=r["color"], lw=2.9, linestyle=_line_style(r["linestyle"]), label=label)
-          for r, label in zip(runs, labels, strict=True)],
+        *[
+            Line2D([], [], color=r["color"], lw=2.9, linestyle=_line_style(r["linestyle"]), label=label)
+            for r, label in zip(runs, labels, strict=True)
+        ],
         Line2D([], [], linestyle="none", label=""),
         Patch(facecolor=HUMAN_BAR, alpha=0.45, hatch="///", edgecolor=HUMAN_BAR, label="Gait120 between-subject"),
     ]
-    legend = fig.legend(handles=handles, loc="lower center", bbox_to_anchor=(0.5, 0.12 / height), ncol=len(handles),
-                        frameon=False, fontsize=18.5, handlelength=2.0, handletextpad=0.5, columnspacing=1.4,
-                        borderaxespad=0)
+    legend = fig.legend(
+        handles=handles,
+        loc="lower center",
+        bbox_to_anchor=(0.5, 0.12 / height),
+        ncol=len(handles),
+        frameon=False,
+        fontsize=18.5,
+        handlelength=2.0,
+        handletextpad=0.5,
+        columnspacing=1.4,
+        borderaxespad=0,
+    )
     legend.get_texts()[1].set_fontweight("bold")
 
     rows_csv = []
     for group, keys, values_by_entity, unit in panels.values():
         for label, _, _, values in values_by_entity:
             for key, sample in zip(keys, values, strict=True):
-                rows_csv.append({
-                    "signal": group, "channel": key, "metric": "rmse" if unit else "pearson_r", "unit": unit,
-                    "entity": label, "n": len(sample),
-                    "mean": float(np.mean(sample)) if len(sample) else np.nan,
-                    "sd": float(np.std(sample)) if len(sample) else np.nan,
-                    "values": ";".join(f"{value:.6g}" for value in sample),
-                })
+                rows_csv.append(
+                    {
+                        "signal": group,
+                        "channel": key,
+                        "metric": "rmse" if unit else "pearson_r",
+                        "unit": unit,
+                        "entity": label,
+                        "n": len(sample),
+                        "mean": float(np.mean(sample)) if len(sample) else np.nan,
+                        "sd": float(np.std(sample)) if len(sample) else np.nan,
+                        "values": ";".join(f"{value:.6g}" for value in sample),
+                    }
+                )
     stem = _stem(data, "_extended")
     output_dir.mkdir(parents=True, exist_ok=True)
     for suffix in ("png", "svg", "pdf"):
@@ -1293,8 +1614,14 @@ def _render_extended_figure(data: dict, output_dir: Path, sequence_dir: Path) ->
     return output_dir / f"{stem}.png"
 
 
-def render(data: dict, output_dir: Path, *, anatomy_dir: Path | None = None,
-           sequence_dir: Path | None = None, extended: bool = False) -> Path:
+def render(
+    data: dict,
+    output_dir: Path,
+    *,
+    anatomy_dir: Path | None = None,
+    sequence_dir: Path | None = None,
+    extended: bool = False,
+) -> Path:
     """Draw the figure and write the PNG, SVG, PDF and metric table."""
     mpl.rcParams.update(RC_PARAMS)
     if extended:
@@ -1312,10 +1639,14 @@ def render(data: dict, output_dir: Path, *, anatomy_dir: Path | None = None,
 
     fig = plt.figure(figsize=(25.0 if anatomy_dir else 19.4, 6.9))
     outer = fig.add_gridspec(
-        1, 3 if anatomy_dir else 2,
+        1,
+        3 if anatomy_dir else 2,
         width_ratios=[0.95, 1.74, 1.0] if anatomy_dir else [1.74, 1.0],
         wspace=0.15 if anatomy_dir else 0.10,
-        left=0.015 if anatomy_dir else 0.040, right=0.990, top=0.872, bottom=0.092,
+        left=0.015 if anatomy_dir else 0.040,
+        right=0.990,
+        top=0.872,
+        bottom=0.092,
     )
     if anatomy_dir:
         _anatomy_legend(fig, outer[0], anatomy_dir)
@@ -1454,14 +1785,19 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--motion_group", default="GAIT120_TESTING", help="Trial-5 motion set naming each rollout.")
     parser.add_argument("--output_dir", required=True, type=Path, help="Directory for the figure and metric table.")
     parser.add_argument(
-        "--anatomy_dir", type=Path,
+        "--anatomy_dir",
+        type=Path,
         help="Add the graphical legend rendered by figures/render_gait120_anatomy.py.",
     )
-    parser.add_argument("--sequence_dir", type=Path,
-                        help="Use the phase-aligned lateral gait layout from render_gait120_sequence.py.")
-    parser.add_argument("--extended", action="store_true",
-                        help="With --sequence_dir from render_gait120_sequence.py --extended: every right-leg "
-                             "joint angle and all eleven EMG muscles (writes gait120_comparison_extended.*).")
+    parser.add_argument(
+        "--sequence_dir", type=Path, help="Use the phase-aligned lateral gait layout from render_gait120_sequence.py."
+    )
+    parser.add_argument(
+        "--extended",
+        action="store_true",
+        help="With --sequence_dir from render_gait120_sequence.py --extended: every right-leg "
+        "joint angle and all eleven EMG muscles (writes gait120_comparison_extended.*).",
+    )
     parser.add_argument(
         "--cache",
         type=Path,
@@ -1485,14 +1821,14 @@ def build_parser() -> argparse.ArgumentParser:
         choices=["subject", "population"],
         default="subject",
         help="Agreement bars: subject-matched profiles (default), or each policy's population profile scored "
-             "against every subject (writes *_population.*). Reuses the same cache.",
+        "against every subject (writes *_population.*). Reuses the same cache.",
     )
     parser.add_argument(
         "--kinematics_source",
         choices=["opensim-ik", "mfb-retargeted"],
         default="opensim-ik",
         help="Human joint-angle ground truth: Gait120 OpenSim IK (default), or the MyoFullBody-retargeted "
-             "reference the policies tracked (writes *_mfb_retargeted.*).",
+        "reference the policies tracked (writes *_mfb_retargeted.*).",
     )
     parser.add_argument("--refresh", action="store_true", help="Re-run the analysis even if the cache exists.")
     return parser
@@ -1550,7 +1886,9 @@ def main(argv: Sequence[str] | None = None) -> int:
             f"  {run['id']:<16} {run['label']:<28} "
             f"kinetics cycles {run['n_kinetics_cycles']}, omissions {run['n_kinetics_omissions']}"
         )
-    print(f"wrote {render(data, args.output_dir, anatomy_dir=args.anatomy_dir, sequence_dir=args.sequence_dir, extended=args.extended)}")
+    print(
+        f"wrote {render(data, args.output_dir, anatomy_dir=args.anatomy_dir, sequence_dir=args.sequence_dir, extended=args.extended)}"
+    )
     return 0
 
 
