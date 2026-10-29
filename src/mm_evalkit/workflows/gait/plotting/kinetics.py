@@ -9,19 +9,29 @@ from matplotlib.colors import to_rgba
 from ..constants import REF_GREY
 from .style import policy_fill_alpha
 
+_KINETICS_PROFILE_COLUMNS = 4
+
 
 def plot_kinetics_profiles(analysis) -> None:
-    """Plot the six joint moments and bilateral vertical GRF over gait phase."""
+    """Plot every joint moment and bilateral vertical GRF over gait phase.
+
+    Panels fill a four-column grid, so the default six moments plus two GRF
+    sides make one 2 x 4 figure and extended channels add rows.
+    """
     cohort = analysis.kinetics
     if cohort is None:
         return
     phase = np.linspace(0.0, 100.0, 100)
-    fig, axes = plt.subplots(2, 4, figsize=(18, 8), sharex=True)
     channels = [
         *(("torque", index, name, cohort.torque_unit) for index, name in enumerate(cohort.torque_names)),
         *(("grf", index, name, cohort.grf_unit) for index, name in enumerate(cohort.grf_names)),
     ]
-    for ax, (signal, index, name, unit) in zip(axes.ravel(), channels, strict=True):
+    n_cols = _KINETICS_PROFILE_COLUMNS
+    n_rows = -(-len(channels) // n_cols)
+    fig, axes = plt.subplots(n_rows, n_cols, figsize=(18, 4 * n_rows), sharex=True, squeeze=False)
+    for ax in axes.ravel()[len(channels) :]:
+        ax.set_visible(False)
+    for ax, (signal, index, name, unit) in zip(axes.ravel()[: len(channels)], channels, strict=True):
         human = cohort.torque_data[:, index] if signal == "torque" else cohort.grf_data[:, index]
         human_mean = np.nanmean(human, axis=0)
         human_std = np.nanstd(human, axis=0)

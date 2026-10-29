@@ -105,7 +105,7 @@ def plot_muscle_metrics(analysis):
                 zorder=2,
             )
 
-        ax.set_ylabel("Activation")
+        ax.set_ylabel(analysis.config.muscle_signal.capitalize())
         if muscle_idx == n_muscles - 1:
             ax.set_xlabel("Gait cycle [%]")
 
@@ -206,7 +206,7 @@ def plot_subject_based_muscle_metrics(analysis):
             if muscle_idx == 0:
                 ax.set_title(f"Subj. {subj_id}")
             if col_idx == 0:
-                ax.set_ylabel("Activation")
+                ax.set_ylabel(analysis.config.muscle_signal.capitalize())
             if muscle_idx == n_muscles - 1:
                 ax.set_xlabel("Gait cycle [%]")
 

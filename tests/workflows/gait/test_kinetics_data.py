@@ -7,7 +7,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from mm_evalkit.datasets.gait120_kinetics import TORQUE_JOINTS
+from mm_evalkit.datasets.gait120_kinetics import EXTENDED_TORQUE_JOINTS, TORQUE_JOINTS
 from mm_evalkit.policies import PolicySpec
 from mm_evalkit.workflows.gait.kinetics_data import (
     load_kinetics_cohort,
@@ -19,7 +19,7 @@ from mm_evalkit.workflows.gait.kinetics_data import (
 from .conftest import make_run
 
 
-def _write_reference(path: Path) -> None:
+def _write_reference(path: Path, torque_joints: tuple[str, ...] = TORQUE_JOINTS) -> None:
     n_frames = 220
     time = np.arange(n_frames) * 0.01
     left = np.zeros(n_frames)
@@ -33,8 +33,8 @@ def _write_reference(path: Path) -> None:
         trial="Trial05",
         step_label="Step01_Step02",
         time_sec=time,
-        joint_torque=np.column_stack([np.arange(n_frames) + 1000 * index for index in range(6)]),
-        joint_torque_columns=np.asarray([f"{name}_moment" for name in TORQUE_JOINTS]),
+        joint_torque=np.column_stack([np.arange(n_frames) + 1000 * index for index in range(len(torque_joints))]),
+        joint_torque_columns=np.asarray([f"{name}_moment" for name in torque_joints]),
         joint_torque_valid=np.ones(n_frames, dtype=bool),
         joint_torque_units="Nm_per_kg",
         computed_grf=np.column_stack([left, 2.0 * (1.0 - left)]),
@@ -83,12 +83,12 @@ def _policy(summary: Path, *, swap: bool = False, policy_id: str = "policy") -> 
     )
 
 
-def _write_embedded_rollout(path: Path) -> None:
+def _write_embedded_rollout(path: Path, torque_joints: tuple[str, ...] = TORQUE_JOINTS) -> None:
     rows = 200
     phase = np.arange(rows, dtype=float)
     model_mass_kg = 10.0
     body_weight_n = model_mass_kg * 9.80665
-    raw_moments = model_mass_kg * np.column_stack([phase + 10 * index for index in range(6)])
+    raw_moments = model_mass_kg * np.column_stack([phase + 10 * index for index in range(len(torque_joints))])
     sensors = np.column_stack(
         [
             np.full(rows, 2.0 * body_weight_n),
@@ -101,8 +101,8 @@ def _write_embedded_rollout(path: Path) -> None:
         path,
         n_episodes=1,
         kinetics_sample_phase="post_step",
-        generalized_actuator_force_joint_names=np.asarray(TORQUE_JOINTS),
-        generalized_actuator_force_units=np.asarray(["Nm"] * 6),
+        generalized_actuator_force_joint_names=np.asarray(torque_joints),
+        generalized_actuator_force_units=np.asarray(["Nm"] * len(torque_joints)),
         force_sensor_names=np.asarray(["r_foot", "r_toes", "l_foot", "l_toes"]),
         force_sensor_units=np.asarray(["N"] * 4),
         model_mass_kg=model_mass_kg,
@@ -111,6 +111,32 @@ def _write_embedded_rollout(path: Path) -> None:
         episode_0_force_sensor_values=sensors,
         episode_0_kinetics_reference_steps=np.arange(rows, dtype=int),
     )
+
+
+def test_generic_rollout_compares_extended_moments_when_requested(tmp_path: Path) -> None:
+    reference_root = tmp_path / "references"
+    reference = reference_root / "S012" / "S012_Trial05_Step01_Step02.npz"
+    rollout = tmp_path / "rollout.npz"
+    _write_reference(reference, EXTENDED_TORQUE_JOINTS)
+    _write_embedded_rollout(rollout, EXTENDED_TORQUE_JOINTS)
+    policy = PolicySpec(id="policy", label="Policy", trajectory_path=rollout, color="blue")
+
+    result = load_policy_kinetics(
+        policy,
+        reference_dir=reference_root,
+        motion_list=("dataset/S012/Trial05/motion",),
+        torque_joints=EXTENDED_TORQUE_JOINTS,
+    )
+
+    assert result.cycles.torque.shape == (2, len(EXTENDED_TORQUE_JOINTS), 100)
+    subtalar = EXTENDED_TORQUE_JOINTS.index("subtalar_angle_r")
+    np.testing.assert_allclose(result.cycles.torque[0, subtalar], 10.0 * subtalar + np.arange(100.0))
+    # The references mirror the left hip adduction moment, so the policy's is mirrored too.
+    adduction_l = EXTENDED_TORQUE_JOINTS.index("hip_adduction_l")
+    np.testing.assert_allclose(result.cycles.torque[0, adduction_l], -(10.0 * adduction_l + np.arange(100.0)))
+    reference_trial = result.references[(12, 5)]
+    assert reference_trial.torque_names == EXTENDED_TORQUE_JOINTS
+    np.testing.assert_allclose(reference_trial.torque_cycles[0, subtalar], 1000.0 * subtalar + np.arange(100.0))
 
 
 def test_policy_summary_maps_exported_sensor_groups_to_anatomical_sides(tmp_path: Path) -> None:
@@ -341,3 +367,47 @@ def test_mismatched_policy_reference_samples_are_rejected(tmp_path: Path) -> Non
 
     with pytest.raises(ValueError, match="do not match"):
         load_kinetics_cohort(runs, reference_dir=None)
+
+
+def test_right_stride_keeps_a_mostly_covered_stride_with_a_nan_tail(tmp_path: Path) -> None:
+    """Rollouts stop before the trial ends; the uncovered tail is NaN, never stretched."""
+    reference_root = tmp_path / "references"
+    reference = reference_root / "S012" / "S012_Trial05_Step01_Step02.npz"
+    _write_reference(reference)
+    with np.load(reference) as archive:
+        values = dict(archive)
+    right = np.zeros(220)
+    right[110:170] = 1.0
+    values["computed_grf"] = np.column_stack([values["computed_grf"][:, 0], right])
+    np.savez(reference, **values)
+    rollout = tmp_path / "rollout.npz"
+    _write_embedded_rollout(rollout)
+    with np.load(rollout) as archive:
+        values = dict(archive)
+    values["episode_0_kinetics_reference_steps"] = np.arange(10, 210, dtype=int)
+    np.savez(rollout, **values)
+    policy = PolicySpec(id="policy", label="Policy", trajectory_path=rollout, color="blue")
+
+    result = load_policy_kinetics(
+        policy,
+        reference_dir=reference_root,
+        motion_list=("dataset/S012/Trial05/motion",),
+        kinetics_window="right_stride",
+    )
+
+    # Reference frames 110..209 of the 110..219 stride are covered: 91 %.
+    torque = result.cycles.torque[0, 0]
+    assert np.isfinite(torque[:90]).all() and np.isnan(torque[-5:]).all()
+    np.testing.assert_allclose(torque[0], 100.0)
+    assert result.omissions == ()
+
+    values["episode_0_kinetics_reference_steps"] = np.arange(0, 200, dtype=int)
+    np.savez(rollout, **values)
+    short = load_policy_kinetics(
+        policy,
+        reference_dir=reference_root,
+        motion_list=("dataset/S012/Trial05/motion",),
+        kinetics_window="right_stride",
+    )
+    # Frames 110..199 cover only 82 % of the stride, so it is an omission.
+    assert [omission.reason for omission in short.omissions] == ["incomplete_reference_window_coverage"]

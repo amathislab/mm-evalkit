@@ -303,6 +303,7 @@ def test_early_termination_is_an_audited_scientific_exclusion(tmp_path: Path):
         episode_0_joint_positions=np.zeros((5, len(joint_names_myo) + 6)),
         episode_0_traj_qpos=np.zeros((10, len(joint_names_myo) + 6)),
         episode_0_muscle_activations=np.zeros((5, len(muscle_names_myo))),
+        episode_0_muscle_commands=np.zeros((5, len(muscle_names_myo))),
         episode_0_touch_observations=np.zeros((5, 4)),
     )
 
@@ -325,6 +326,54 @@ def test_early_termination_is_an_audited_scientific_exclusion(tmp_path: Path):
         }
     ]
     assert extracted.episode_gait_records[0]["reason"] == "early_termination"
+
+
+def test_excitation_is_clipped_muscle_command(tmp_path: Path):
+    """Excitation is the [0, 1]-limited control, not the exported activation."""
+    from mm_evalkit.activation import excitation_from_commands
+
+    commands = np.array([[-0.5, 0.25, 1.0], [0.0, 0.75, 1.0]])
+    np.testing.assert_array_equal(excitation_from_commands(commands), [[0.0, 0.25, 1.0], [0.0, 0.75, 1.0]])
+
+
+def test_excitation_analysis_requires_muscle_commands(tmp_path: Path):
+    """An archive without commands cannot silently fall back to activation."""
+    rollout_path = tmp_path / "no_commands.npz"
+    np.savez(
+        rollout_path,
+        n_episodes=1,
+        dt=0.01,
+        joint_names=np.asarray(joint_names_myo),
+        episode_0_traj_id=0,
+        episode_0_traj_length=5,
+        episode_0_joint_positions=np.zeros((5, len(joint_names_myo) + 6)),
+        episode_0_traj_qpos=np.zeros((5, len(joint_names_myo) + 6)),
+        episode_0_muscle_activations=np.zeros((5, len(muscle_names_myo))),
+        episode_0_touch_observations=np.zeros((5, 4)),
+    )
+    with pytest.raises(ValueError, match="episode_0_muscle_commands"):
+        policy_data.extract_trajectory_data(
+            CHANNELS,
+            rollout_path,
+            subject_based=True,
+            motion_list=MOTION_SETS["GAIT120_TESTING_SUBJECTS"][:1],
+            muscle_signal="excitation",
+        )
+
+
+def test_muscle_signal_is_validated(tmp_path: Path):
+    with pytest.raises(ValueError, match="muscle_signal"):
+        FullBodyConfig.from_arguments(
+            dataset_name="Wang",
+            dataset_dir=tmp_path,
+            policy_config_file=tmp_path / "policies.yaml",
+            subject_based=False,
+            motion_set_name=None,
+            plots_root=tmp_path / "plots",
+            kinematics_source="opensim-ik",
+            human_subject_policy="drop-and-report",
+            muscle_signal="emg",
+        )
 
 
 def test_wang_rejects_subject_based_mode(tmp_path: Path):

@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
+from mm_evalkit.activation import DEFAULT_MUSCLE_SIGNAL
 from mm_evalkit.paths import resolve_dataset_path
 from mm_evalkit.policies import (
     PolicySpec,
@@ -18,6 +19,8 @@ from .constants import MOTION_SETS, PRIMARY_MOTION_SETS
 DatasetName = Literal["Gait120", "Wang"]
 KinematicsSource = Literal["opensim-ik", "mfb-retargeted"]
 HumanSubjectPolicy = Literal["drop-and-report", "error"]
+MuscleSignal = Literal["activation", "excitation"]
+KineticsWindow = Literal["left_heel_strike", "right_stride"]
 
 
 @dataclass(frozen=True)
@@ -39,6 +42,9 @@ class FullBodyConfig:
     kinematics_source: KinematicsSource
     human_subject_policy: HumanSubjectPolicy = "drop-and-report"
     kinetics_reference_dir: Path | None = None
+    muscle_signal: MuscleSignal = DEFAULT_MUSCLE_SIGNAL
+    kinetics_window: KineticsWindow = "left_heel_strike"
+    extended_channels: bool = False
 
     @classmethod
     def from_arguments(
@@ -53,6 +59,9 @@ class FullBodyConfig:
         kinematics_source: str,
         human_subject_policy: str,
         kinetics_reference_dir: str | Path | None = None,
+        muscle_signal: str = DEFAULT_MUSCLE_SIGNAL,
+        kinetics_window: str = "left_heel_strike",
+        extended_channels: bool = False,
     ) -> FullBodyConfig:
         """Validate public API arguments before any rollout is opened."""
         if dataset_name not in {"Gait120", "Wang"}:
@@ -67,8 +76,14 @@ class FullBodyConfig:
             raise ValueError(
                 f"human_subject_policy must be 'drop-and-report' or 'error', got {human_subject_policy!r}."
             )
+        if muscle_signal not in {"activation", "excitation"}:
+            raise ValueError(f"muscle_signal must be 'activation' or 'excitation', got {muscle_signal!r}.")
+        if kinetics_window not in {"left_heel_strike", "right_stride"}:
+            raise ValueError(f"kinetics_window must be 'left_heel_strike' or 'right_stride', got {kinetics_window!r}.")
 
         resolved_subject_based = dataset_name == "Gait120" if subject_based is None else subject_based
+        if extended_channels and dataset_name != "Gait120":
+            raise ValueError("extended_channels is only valid for Gait120 analyses.")
         if dataset_name == "Wang" and resolved_subject_based:
             raise ValueError("Wang has no subject identity mapping; set subject_based=False explicitly.")
         if kinematics_source == "mfb-retargeted" and (dataset_name != "Gait120" or not resolved_subject_based):
@@ -112,6 +127,9 @@ class FullBodyConfig:
             kinematics_source=kinematics_source,
             human_subject_policy=human_subject_policy,
             kinetics_reference_dir=kinetics_path,
+            muscle_signal=muscle_signal,
+            kinetics_window=kinetics_window,
+            extended_channels=extended_channels,
         )
 
     def load_policies(self) -> list[PolicySpec]:

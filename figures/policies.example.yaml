@@ -1,0 +1,38 @@
+# Rollouts compared by figures/plot_gait120_comparison.py.
+#
+# Colour and line style are read from this file, so restyling the figure means
+# editing here rather than the plotting script.
+#
+# The palette is checked for colour-vision separation: blue, red and violet all
+# clear the adjacent-pair gates against one another. Green sits in the warning
+# band against red, so it carries a dashed line style as a secondary encoding --
+# the plotting script also hatches the bars of any non-solid policy. Keep that
+# pairing if you add green, or choose a hue that clears the gate on colour alone.
+#
+# Rollouts must share one ordered motion group. If an archive's reference
+# trajectory is unaligned, run figures/align_rollout.py first.
+
+policies:
+  - id: myofullbody
+    label: "MyoFullBody (PPO)"
+    trajectory_data_path: rollouts/myofullbody_stochastic_aligned.npz
+    color: "#2a78d6"
+    linestyle: "-"
+
+  - id: myosim
+    label: "MyoSim-FB (PPO)"
+    trajectory_data_path: rollouts/myosim_fb_stochastic_aligned.npz
+    color: "#e34948"
+    linestyle: "-"
+
+  - id: flashsac
+    label: "MyoFullBody (FlashSAC)"
+    trajectory_data_path: rollouts/myofullbody_flashsac_stochastic_aligned.npz
+    color: "#4a3aa7"
+    linestyle: "-"
+
+  - id: motions100
+    label: "MyoFullBody (mm-motions-100)"
+    trajectory_data_path: rollouts/myofullbody_motions100_stochastic_aligned.npz
+    color: "#008300"
+    linestyle: "--"

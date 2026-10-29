@@ -1,4 +1,4 @@
-"""Align exported muscle activation with the rollout observation timeline."""
+"""Decode exported muscle signals on the rollout observation timeline."""
 
 from __future__ import annotations
 
@@ -9,6 +9,7 @@ import numpy as np
 PRE_STEP = "pre_step"
 POST_STEP = "post_step"
 _VALID_PHASES = frozenset({PRE_STEP, POST_STEP})
+DEFAULT_MUSCLE_SIGNAL = "excitation"
 
 
 def activation_sample_phase(archive: Any) -> str:
@@ -55,6 +56,45 @@ def align_activation_to_observation_timeline(
     if len(values) > 1:
         aligned[1:] = values[:-1]
     return aligned
+
+
+def excitation_from_commands(commands: np.ndarray) -> np.ndarray:
+    """Return muscle excitation on the pre-step state timeline.
+
+    ``muscle_commands`` is the policy action after clipping to [-1, 1]. MuJoCo
+    activation dynamics internally clamp control to [0, 1], so excitation
+    is that command clipped to [0, 1]. Row ``i`` is the
+    control held over the step that starts at state ``i``, so it already shares
+    the qpos timeline whatever ``muscle_command_sample_phase`` says.
+    """
+    values = np.asarray(commands, dtype=float)
+    if values.ndim != 2:
+        raise ValueError(f"Muscle commands must have shape (frames, muscles); got {values.shape}.")
+    return np.clip(values, 0.0, 1.0)
+
+
+def muscle_signal_from_archive(
+    archive: Any,
+    episode: int,
+    *,
+    muscle_signal: str = DEFAULT_MUSCLE_SIGNAL,
+    activation_phase: str | None = None,
+) -> np.ndarray:
+    """Read excitation or activation [0, 1] as [frames, muscles] on the state timeline.
+
+    Commands describe the control interval starting at each exported state.
+    Activation snapshots use the archive's pre-step or post-step convention.
+    """
+    if muscle_signal not in {"excitation", "activation"}:
+        raise ValueError(f"muscle_signal must be 'activation' or 'excitation', got {muscle_signal!r}.")
+    field = "muscle_commands" if muscle_signal == "excitation" else "muscle_activations"
+    key = f"episode_{episode}_{field}"
+    if key not in archive:
+        raise ValueError(f"Rollout has no {key}; muscle_signal={muscle_signal!r} requires this field.")
+    if muscle_signal == "excitation":
+        return excitation_from_commands(archive[key])
+    phase = activation_sample_phase(archive) if activation_phase is None else activation_phase
+    return align_activation_to_observation_timeline(archive[key], phase)
 
 
 def complete_activation_gait_indexes(

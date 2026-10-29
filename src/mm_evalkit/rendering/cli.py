@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 from collections.abc import Sequence
 
+from mm_evalkit.activation import DEFAULT_MUSCLE_SIGNAL
 from mm_evalkit.cli_options import add_dataset_dir, add_motion_group, add_video_output
 from mm_evalkit.datasets.motion_sets import GAIT120_MOTION_SETS
 
@@ -43,6 +44,13 @@ def build_parser() -> argparse.ArgumentParser:
     gait.add_argument("--gait_index", "--gait-index", dest="gait_index", type=int, choices=(0, 1), default=0)
     add_dataset_dir(gait, dataset="gait120")
     gait.add_argument("--channels", nargs="+", default=None)
+    gait.add_argument(
+        "--muscle_signal",
+        "--muscle-signal",
+        choices=["excitation", "activation"],
+        default=DEFAULT_MUSCLE_SIGNAL,
+        help="Policy muscle signal compared with EMG and used for tendon styling (default: excitation).",
+    )
     _add_camera(gait, azimuth=105.0, elevation=-12.0, distance=2.4)
     add_video_output(gait)
     return parser

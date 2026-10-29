@@ -12,12 +12,14 @@ from pathlib import Path
 import numpy as np
 
 from mm_evalkit.datasets.gait120 import Gait120_muscle_map, Gait120_muscle_names
+from mm_evalkit.datasets.gait120_kinetics import EXTENDED_TORQUE_JOINTS, TORQUE_JOINTS
 from mm_evalkit.datasets.wang import Wang_muscle_map
 
 from . import diagnostics, human_data, kinetics_data, policy_data
 from .channels import (
     common_joint_names,
     common_muscle_names,
+    gait120_extended_joint_names,
     joint_names_myo,
     muscle_names_myo,
 )
@@ -36,13 +38,14 @@ def required_indices(requested, available, *, signal: str) -> list[int]:
     return [available.index(name) for name in requested]
 
 
-def build_channels(dataset_name: str) -> GaitChannels:
+def build_channels(dataset_name: str, *, extended: bool = False) -> GaitChannels:
     """Select the joint and muscle channels this dataset can be compared on.
 
     Gait120 records every muscle that has a MyoFullBody counterpart; Wang is
-    compared on the subset both datasets share.
+    compared on the subset both datasets share. ``extended`` adds the Gait120
+    subtalar and MTP angles.
     """
-    joint_names = list(common_joint_names)
+    joint_names = list(gait120_extended_joint_names if extended else common_joint_names)
     muscle_names = list(Gait120_muscle_names if dataset_name == "Gait120" else common_muscle_names)
     return GaitChannels(
         joint_names=tuple(joint_names),
@@ -93,7 +96,7 @@ def load_gait_analysis(config: FullBodyConfig) -> GaitAnalysis:
     """Validate every configured input, then load the rollouts and human data."""
     policy_specs = config.load_policies()
     output_dir = prepare_output_dir(config)
-    channels = build_channels(config.dataset_name)
+    channels = build_channels(config.dataset_name, extended=config.extended_channels)
     muscle_map = Gait120_muscle_map if config.dataset_name == "Gait120" else Wang_muscle_map
     motion_list = MOTION_SETS[config.motion_set_name] if config.motion_set_name is not None else None
 
@@ -112,6 +115,7 @@ def load_gait_analysis(config: FullBodyConfig) -> GaitAnalysis:
             policy,
             subject_based=config.subject_based,
             motion_list=motion_list,
+            muscle_signal=config.muscle_signal,
         )
         for policy in policy_specs
     ]
@@ -126,6 +130,8 @@ def load_gait_analysis(config: FullBodyConfig) -> GaitAnalysis:
         policies,
         reference_dir=config.kinetics_reference_dir,
         motion_list=motion_list,
+        kinetics_window=config.kinetics_window,
+        torque_joints=EXTENDED_TORQUE_JOINTS if config.extended_channels else TORQUE_JOINTS,
     )
     kinetics_data.write_kinetics_omission_audit(policies, output_dir)
 
